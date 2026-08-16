@@ -1,0 +1,20 @@
+name: drift-check
+
+on:
+  schedule:
+    - cron: "0 3 1 * *" # monthly, 03:00 UTC on the 1st
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run drift checks
+        run: python tests/smoke_test.py
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
