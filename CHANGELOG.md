@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 — 2026-08-17
+
+- Chinese README is now the primary `README.md`; English moved to `README_EN.md`
+
 ## 1.0.1 — 2026-08-17
 
 - Added Chinese README (`README_zh.md`) with language switcher links
