@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 — 2026-08-17
+
+- Added Chinese README (`README_zh.md`) with language switcher links
+
 ## 1.0.0 — 2026-08-17
 
 Initial release.

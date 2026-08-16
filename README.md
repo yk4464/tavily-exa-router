@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+English | [简体中文](README_zh.md)
+
 Independent project. Not affiliated with, endorsed by, or sponsored by Tavily
 or Exa Labs. Both names are trademarks of their respective owners.
 
