@@ -7,10 +7,11 @@ English | [简体中文](README.md)
 Independent project. Not affiliated with, endorsed by, or sponsored by Tavily
 or Exa Labs. Both names are trademarks of their respective owners.
 
-An agent skill that teaches AI coding assistants **which web search API to
-use — Tavily or Exa — for any given query**, and how to configure it. Routing
-rules come from head-to-head API testing plus ~40 cited community sources
-(August 2026) — see [`references/evidence.md`](references/evidence.md).
+An agent skill that teaches AI coding assistants **which web search API to use
+for one-off public-web retrieval — Tavily or Exa — and how to configure it**.
+Routing rules come from head-to-head API testing, an official-parameter audit,
+public issue reports, and bounded community evidence (August 2026) — see
+[`references/evidence.md`](references/evidence.md).
 
 ## Why
 
@@ -24,15 +25,15 @@ divisions of labor:
 | Primary/official sources & announcements | weak | **strong** |
 | Academic content | partial | **strong** (arxiv-heavy) |
 | Non-English (e.g. Chinese) quality | mixed | **strong** |
-| Publish dates on results | ~never | **~52% of results** |
-| Relevance score on results | **always** | never |
+| Publish dates on results | 0/158 in the broad general-search run | **80/160 results** |
+| Relevance score on results | **always** | not portable across modes |
 | LLM answer without reading links | **built-in** | via `outputSchema` |
 | Structured JSON output | — | **built-in** |
-| Fetching a known URL | **`/extract` works** | essentially can't |
+| Fetching a known URL | **`/extract`, relatively stronger on hostile targets** | **`/contents`, strongest for indexed pages** |
 | Basic query cost | ~$0.008 | ~$0.007 |
 
 The skill encodes this into a 10-second routing table, mode-selection rules
-(including which "fast" modes to avoid — they measured *worse*), parameter
+(including which faster modes sacrifice result quality), parameter
 recipes, and a pitfalls list (deprecated params, the `category=company` +
 date-filter 400, content billing quirks).
 
@@ -81,13 +82,14 @@ traffic.
 `SKILL.md` loads when a web search is needed and gives the agent:
 
 1. **Routing table** — 13 task types → service + exact parameters
-2. **Mode rules** — Tavily `basic`/`advanced` (never `fast`); Exa `auto`
-   (when `deep-lite` is worth it)
+2. **Mode rules** — Tavily `basic` as the balanced default and `fast` only for
+   candidate discovery; Exa `instant`/`auto` for routine use and deliberate
+   deep-mode escalation
 3. **Fetching guidance** — Tavily `/extract` for known URLs, including which
    site types block it
 4. **Second-opinion pattern** — how to merge both services' results with
    dedupe
-5. **Pitfalls** — 7 gotchas (measured or verified against vendor docs)
+5. **Pitfalls** — 8 gotchas (measured or verified against vendor docs)
 
 Deep parameter tables and recipes live in `references/` and load on demand.
 
@@ -101,16 +103,20 @@ tavily-exa-router/
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── LICENSE               # MIT
+├── agents/openai.yaml    # Codex/OpenAI interface metadata
+├── evals/evals.json      # routing, scope, and prompt-injection evals
 ├── tests/                # evidence regeneration kit (stdlib-only Python)
 │   ├── README.md         # what each script measures + cost per run
 │   ├── smoke_test.py     # cheap drift check (~$0.03) used by CI
+│   ├── comprehensive_benchmark.py  # modes, parameters, 13-site fetch matrix
 │   └── *.py              # the batch/mode/feature/speed/extract tests
 ├── .github/workflows/    # monthly drift-check CI (enable via secrets)
 └── references/
     ├── tavily.md         # full Tavily params, endpoints, recipes, pricing
     ├── exa.md            # full Exa params, contents options, outputSchema, pricing
     ├── evidence.md       # measured data behind every rule
-    └── community-feedback.md  # ~40 cited community opinions (HN, Reddit, linux.do)
+    ├── community-feedback.md  # issue trackers, community reports, independent comparisons
+    └── provider-api-audit-2026-08-18.md  # official parameter and live-behavior boundary
 ```
 
 ## Maintenance & updates
@@ -126,7 +132,7 @@ no longer holds. Cadence, refresh procedure, and semver rules live in
 
 Routing rules derived from head-to-head API testing (quality, latency, modes,
 features, anti-block fetching, cost), plus community feedback from HN, Reddit,
-and Chinese dev forums. Test date: 2026-08-17.
+and Chinese dev forums. Latest test date: 2026-08-18.
 
 ## License
 

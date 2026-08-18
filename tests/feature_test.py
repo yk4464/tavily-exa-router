@@ -6,6 +6,7 @@ import json
 import os
 import time
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 TAVILY_KEY = os.environ["TAVILY_API_KEY"]
 EXA_KEY = os.environ["EXA_API_KEY"]
@@ -29,6 +30,7 @@ def exa(payload):
 
 
 out = []
+seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
 
 
 def record(name, svc, payload, summary):
@@ -98,7 +100,7 @@ record("exa:subpages", "exa",
        lambda d: f"  {json.dumps([{'main': r.get('url'), 'subs': [s.get('url') for s in (r.get('subpages') or [])][:3]} for r in d.get('results', [])])[:350]}")
 record("exa:startPublishedDate(7d)", "exa",
        {"query": "AI model releases", "numResults": 5, "type": "auto",
-        "startPublishedDate": "2026-08-10T00:00:00Z"},
+        "startPublishedDate": seven_days_ago},
        lambda d: f"  {len(d.get('results', []))} results: {rlist(d, 4, dated=True)}")
 record("exa:category=company", "exa",
        {"query": "Exa AI search", "numResults": 5, "category": "company"},

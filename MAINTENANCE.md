@@ -16,18 +16,24 @@ is the playbook for keeping it honest.
 | When | What |
 |---|---|
 | Monthly (automated) | `tests/smoke_test.py` via GitHub Actions — flags drift in load-bearing facts (costs ~$0.03) |
-| Quarterly (manual) | Re-run `batch_compare.py` + `feature_test.py` + `extract_test.py`; refresh `references/evidence.md` |
+| Quarterly (manual) | Re-run `batch_compare.py` and all `comprehensive_benchmark.py` suites; manually review the fixed quality queries; refresh `references/evidence.md` |
 | On vendor announcement | Targeted re-test of the affected section only |
+| On major SDK/MCP release | Re-check provider issue trackers and refresh `references/community-feedback.md` |
 
 ## Refresh procedure
 
 1. Run the scripts (see `tests/README.md` for costs):
-   `python tests/batch_compare.py` etc.
-2. Update `references/evidence.md`: replace drifted numbers, **bump the
+   `python tests/batch_compare.py` and the relevant comprehensive suites.
+2. Inspect semantic evidence, not just HTTP status: domain constraints,
+   per-URL failures, result fields, SSE completion, output-schema shape, cache
+   state, login walls, and prompt-like instructions in fetched pages.
+3. Manually review all fixed mode-query results. The allowlisted community and
+   authority counts are heuristics and cannot grade relevance by themselves.
+4. Update `references/evidence.md`: replace drifted numbers, **bump the
    "as of" dates**, and note what changed (don't silently rewrite history).
-3. If a routing rule in `SKILL.md` no longer matches the evidence, change
+5. If a routing rule in `SKILL.md` no longer matches the evidence, change
    the rule and say why in the CHANGELOG.
-4. Update `SKILL.md` frontmatter `metadata.version` and `CHANGELOG.md`,
+6. Update `SKILL.md` frontmatter `metadata.version` and `CHANGELOG.md`,
    commit, tag.
 
 ## Versioning (semver)

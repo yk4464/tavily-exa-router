@@ -3,8 +3,11 @@
 Concurrency: 6 workers for API calls, 10 for HTTP spot-checks.
 """
 import json
+import math
 import os
+import statistics
 import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
@@ -68,16 +71,34 @@ def exa(q):
             for r in d.get("results", [])], d.get("costDollars")
 
 
-def run_pair(item):
+def run_pair(indexed_item):
+    index, item = indexed_item
     cat, q = item
     row = {"cat": cat, "query": q}
-    for name, fn in (("tavily", tavily), ("exa", exa)):
+    providers = (("tavily", tavily), ("exa", exa))
+    if index % 2:
+        providers = tuple(reversed(providers))
+    for name, fn in providers:
+        started = time.perf_counter()
         try:
             results, cost = fn(q)
-            row[name] = {"results": results, "cost": cost, "error": None}
+            row[name] = {"results": results, "cost": cost, "error": None,
+                         "elapsed_ms": round((time.perf_counter() - started) * 1000)}
         except Exception as exc:  # noqa: BLE001
-            row[name] = {"results": [], "cost": None, "error": str(exc)}
+            row[name] = {"results": [], "cost": None, "error": str(exc),
+                         "elapsed_ms": round((time.perf_counter() - started) * 1000)}
     return row
+
+
+def usage_value(service, value):
+    if not isinstance(value, dict):
+        return value
+    return value.get("credits") if service == "tavily" else value.get("total")
+
+
+def percentile(values, fraction):
+    ordered = sorted(values)
+    return ordered[max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))]
 
 
 def domain(u):
@@ -123,7 +144,7 @@ def http_check(url):
 if __name__ == "__main__":
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=6) as ex:
-        rows = list(ex.map(run_pair, QUERIES))
+        rows = list(ex.map(run_pair, enumerate(QUERIES)))
 
     # HTTP spot-check: up to 3 URLs per query per service
     check_urls = []
@@ -143,6 +164,7 @@ if __name__ == "__main__":
     tot = {"tavily": {"n": 0, "comm": 0, "auth": 0, "dated": 0, "err": 0},
            "exa": {"n": 0, "comm": 0, "auth": 0, "dated": 0, "err": 0}}
     costs = {"tavily": [], "exa": []}
+    latencies = {"tavily": [], "exa": []}
     for row in rows:
         line = f"{row['cat']:<11}{row['query'][:40]:<42}"
         for svc in ("tavily", "exa"):
@@ -151,6 +173,7 @@ if __name__ == "__main__":
                 tot[svc]["err"] += 1
                 line += f"| {'ERR':^22}"
                 continue
+            latencies[svc].append(row[svc]["elapsed_ms"])
             doms = [domain(r["u"]) for r in rs]
             n, comm, auth = len(rs), sum(tier(d) == "comm" for d in doms), sum(tier(d) == "auth" for d in doms)
             dated = sum(1 for r in rs if r.get("d"))
@@ -158,7 +181,9 @@ if __name__ == "__main__":
                              "auth": tot[svc]["auth"] + auth, "dated": tot[svc]["dated"] + dated})
             line += f"| {n:>2}/{comm}/{auth}/{dated:<8}"
             if row[svc]["cost"] is not None:
-                costs[svc].append(row[svc]["cost"])
+                value = usage_value(svc, row[svc]["cost"])
+                if isinstance(value, (int, float)):
+                    costs[svc].append(value)
         print(line)
 
     print("\n== totals (out of 20 queries) ==")
@@ -178,6 +203,12 @@ if __name__ == "__main__":
             overlaps.append(len(dt & de) / len(dt | de))
     print(f"\n== domain overlap per query (Jaccard, avg): {sum(overlaps) / len(overlaps):.2f}")
 
+    print("\n== API latency (20 mixed queries, concurrent run) ==")
+    for svc in ("tavily", "exa"):
+        vals = latencies[svc]
+        print(f"  {svc:<7} median={statistics.median(vals):.0f}ms "
+              f"p95={percentile(vals, 0.95):.0f}ms min={min(vals):.0f}ms max={max(vals):.0f}ms")
+
     ok = sum(1 for s in statuses.values() if s == 200)
     bad = {u: s for u, s in statuses.items() if s != 200}
     print(f"== link validity: {ok}/{len(statuses)} returned 200; failures: {len(bad)}")
@@ -190,4 +221,4 @@ if __name__ == "__main__":
         if vals and svc == "exa":
             print(f"  exa  costDollars avg={sum(vals) / len(vals):.4f} max={max(vals):.4f} over {len(vals)} queries")
         elif vals:
-            print(f"  tavily usage samples: {json.dumps(vals[:3])}")
+            print(f"  tavily credits avg={sum(vals) / len(vals):.2f} max={max(vals):.0f} over {len(vals)} queries")

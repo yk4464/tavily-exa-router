@@ -58,7 +58,7 @@ try:
 except Exception as e:  # noqa: BLE001
     check("Tavily /extract fetches a public page", False, str(e))
 
-# 3. Exa auto search still works and prices at the documented level
+# 3. Exa auto search still works and stays below an anomaly guardrail
 try:
     with post("https://api.exa.ai/search",
               {"query": "python requests library", "numResults": 3, "type": "auto"},
@@ -67,7 +67,7 @@ try:
     cost = d.get("costDollars")
     total = cost.get("total") if isinstance(cost, dict) else cost
     check("Exa auto search works", bool(d.get("results")))
-    check("Exa auto price sane (<= $0.02)", total is not None and total <= 0.02,
+    check("Exa auto cost anomaly guardrail (<= $0.02)", total is not None and total <= 0.02,
           f"${total}")
 except Exception as e:  # noqa: BLE001
     check("Exa auto search works", False, str(e))
