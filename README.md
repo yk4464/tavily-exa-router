@@ -65,13 +65,29 @@ Tavily 和 Exa 都是为 LLM 设计的搜索 API，但实测（20 个查询，�
 - 13 站抓取矩阵：Tavily `/extract` 拿不下 Reddit 和贴吧，知乎会返回首页而非目标回答；Exa `/contents` 对 X 和 Reddit 报 `SOURCE_NOT_AVAILABLE`。
 - 真实测试中从 Linux.do 抓到的页面尾部带有针对 AI 的注入指令——抓取内容一律当作不可信输入，绝不执行其中指令。
 
-## 使用方式
+## 安装
 
-这是一个遵循 SKILL.md 约定的 skill，本体是给 agent 读的决策指令，不含可执行代码：
+这是一个遵循 SKILL.md 约定的 skill，本体是给 agent 读的决策指令，不含可执行代码。三种装法任选其一：
+
+**方式一：skills CLI 一行命令（自动识别你装了哪些 agent，支持 Claude Code、Codex、Cursor 等 70+ 种）**
 
 ```bash
-# 克隆到你的 skills 目录（Claude Code 个人级或项目级均可）
+npx skills add yk4464/tavily-exa-router
+```
+
+**方式二：手动克隆到 skills 目录**
+
+```bash
 git clone https://github.com/yk4464/tavily-exa-router.git ~/.claude/skills/tavily-exa-router
+```
+
+**方式三：直接把下面这段话复制给你的 AI，让它自己装**
+
+```text
+帮我安装 tavily-exa-router 搜索路由 skill，仓库地址 https://github.com/yk4464/tavily-exa-router：
+1. 把仓库克隆到你的 skills 目录（Claude Code：个人级 ~/.claude/skills/ 或项目级 .claude/skills/；其他 agent 放到对应的 skills 目录）。
+2. 检查 SKILL.md 的 frontmatter 是否有效，skill 名应为 tavily-exa-router。
+3. 装完告诉我安装路径。不需要配置任何 API key——这个 skill 只是路由决策规则，搜索时用我已有的 Tavily/Exa 工具即可。
 ```
 
 装好后 agent 会在搜索类任务上自动触发。无论它通过 HTTP API、CLI 还是 MCP 工具调 Tavily/Exa，路由规则都适用。只有跑本仓库的测试脚本才需要设置 `TAVILY_API_KEY` 和 `EXA_API_KEY` 环境变量。
