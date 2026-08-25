@@ -1,10 +1,10 @@
 # tavily-exa-router
 
-[中文](README.md) · Current version v1.2.0 · Evidence tested 2026-08
+[中文](README.md) · Current version v1.2.1 · Evidence tested 2026-08
 
 A search-routing **skill for AI coding assistants** (Claude Code and friends): when a task has to choose between the Tavily and Exa search APIs, it says which one to pick and how to configure it, by query type. Every rule is backed by measurements from 2026-08-18 — not by preference.
 
-As of v1.2.0, whenever **both Tavily and Exa tools are visible** in the environment, this skill is the **default entry point** for public-web retrieval — searches, news checks, research, and known-URL fetches all go through it first; the browser and generic WebFetch/WebSearch are fallbacks unless the user explicitly asks for them.
+As of v1.2.0, whenever **both Tavily and Exa tools are visible** in the environment, this skill is the **default entry point** for public-web retrieval — searches, news checks, research, and known-URL fetches all go through it first; the browser and generic WebFetch/WebSearch are fallbacks unless the user explicitly asks for them. The trigger condition is visibility in the tool list alone — **no pre-checks or probe requests needed**.
 
 ## Why it exists
 
@@ -94,15 +94,17 @@ npx skills add yk4464/tavily-exa-router
 git clone https://github.com/yk4464/tavily-exa-router.git ~/.claude/skills/tavily-exa-router
 ```
 
-**Option 3: copy the prompt below and hand it to your AI — it checks the environment first, then installs**
+**Option 3: copy the prompt below and hand it to your AI — it checks the environment first, then installs (these checks run once at install time only; skip everything if already installed)**
 
 ```text
-Install the tavily-exa-router search-routing skill for me (repo: https://github.com/yk4464/tavily-exa-router). Run an environment check first, and only install the skill after both search services are verified working:
+Install the tavily-exa-router search-routing skill for me (repo: https://github.com/yk4464/tavily-exa-router). The checks below belong to the install flow and run once, at first install:
+0. Look in the skills directory first: if tavily-exa-router already exists and the Tavily/Exa tools were previously verified working, just reply "already installed" and stop — no re-checking, no reinstalling.
 1. Check whether Tavily and Exa tools are visible and callable in the current environment — send one minimal live search through each; don't just look at the tool list.
 2. Visible but failing: diagnose and fix it (usually an expired or missing key). If it can't be fixed, ask me for a new API key — sign up at https://app.tavily.com for Tavily and https://dashboard.exa.ai for Exa (both have free tiers).
 3. Not visible (not installed): install and configure the corresponding Tavily / Exa tools (MCP or CLI) first, asking me for the API keys during setup.
 4. Once both services pass a live check, clone the repo into your skills directory (Claude Code: ~/.claude/skills/ personal or .claude/skills/ project; other agents: the equivalent skills directory) and verify the SKILL.md frontmatter is valid with skill name tavily-exa-router.
 5. Tell me the install path and the results of both service checks.
+Note: the environment check belongs to this install only. In everyday conversations afterwards, do NOT re-run any environment checks — just execute search tasks directly following the skill's routing rules.
 ```
 
 Once installed, whenever both Tavily and Exa tools are visible, public-web retrieval (searching, fact-finding, fetching known URLs) goes through this skill by default instead of the browser or generic WebFetch — unless you explicitly ask for another way. The routing rules apply whether it calls Tavily/Exa via HTTP API, CLI, or MCP tools. You only need `TAVILY_API_KEY` and `EXA_API_KEY` environment variables to run this repo's test scripts.

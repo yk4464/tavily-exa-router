@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.1 — 2026-08-26
+
+- Fixed runtime over-checking: the trigger condition is visibility in the
+  tool list only; SKILL.md now explicitly forbids probe/test requests
+  before the real query (verification belongs to the install flow, not
+  everyday conversations)
+- Install prompt gained an "already installed → stop" early exit and an
+  install-time-only note so agents stop re-running the environment check
+  in new conversations
+- Front-loaded the description ("use this FIRST, before any
+  provider-specific Tavily/Exa skill, browser, WebSearch, or WebFetch")
+  and moved the default-trigger section to the top of SKILL.md to raise
+  trigger prominence
+- Added a "sending test searches before the real query" common mistake
+
 ## 1.2.0 — 2026-08-25
 
 - Made the skill the default router: whenever Tavily and Exa are both

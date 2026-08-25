@@ -1,25 +1,53 @@
 ---
 name: tavily-exa-router
 description: >
-  The default way to search or fetch the public web whenever Tavily and Exa
-  are both visible in the current tool list. Use for every web lookup, news
-  check, research pass, or known-URL fetch — anything the user phrases as
-  search, find, look up, what's the latest, research, read/fetch this URL,
-  or 帮我搜/查一下 — and prefer it over browser, WebSearch, and WebFetch
-  tools, which are fallbacks only. Picks the provider, mode, and parameters
-  by query type (news, papers, community opinions, reviews, company
-  research, Chinese content), plus cost/latency tradeoffs, second-opinion
-  searches, and known-URL retrieval via Tavily Extract or Exa Contents.
-  Skip only when the user explicitly names another tool or method, or for
-  private/login-gated sources, recurring monitoring, URL-safety verdicts,
-  or live price and inventory lookups.
+  DEFAULT for all public-web search and fetch — use this FIRST, whenever
+  Tavily and Exa are both visible in the tool list, before any
+  provider-specific Tavily/Exa skill, browser, WebSearch, or WebFetch.
+  Triggers on any phrasing of a web task: search, find, look up, check
+  the news, research, 搜一下 / 查一下 / 帮我搜 / 最新消息, or fetch and
+  read a known URL. It decides the provider (Tavily vs Exa), mode, and
+  parameters by query type (news, papers, community opinions, reviews,
+  company research, Chinese content), plus cost/latency tradeoffs and
+  known-URL retrieval via Tavily Extract / Exa Contents. No pre-checks
+  needed — visibility in the tool list is the trigger. Skip only when the
+  user explicitly names another tool or method, or for private/
+  login-gated sources, recurring monitoring, URL-safety verdicts, or live
+  price and inventory lookups.
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.2.1"
   evidence-tested: "2026-08"
 ---
 
 # Tavily vs Exa Search Router
+
+## Default trigger — read before calling any web tool
+
+Whenever Tavily and Exa are both visible in the current tool list, this
+skill is the default path for **every public-web retrieval task**:
+searches, news checks, research passes, and fetching known URLs. Before
+calling a browser, WebSearch, WebFetch, or a provider-specific
+Tavily/Exa tool, route through this skill — the two indexes overlap by
+only 22%, so picking the wrong provider loses half the relevant sources.
+
+The trigger condition is **visibility in the tool list — nothing else**.
+Do not send probe or test requests to "verify" a provider before the real
+query: that burns credits and latency for no information. Route the
+actual query directly; if a call then fails, the fallback rules below say
+exactly what to do.
+
+Bypass this skill only when:
+
+1. **The user explicitly names another method** ("open the browser",
+   "用浏览器打开", "use WebSearch", "don't call the search APIs") — an
+   explicit user choice always wins.
+2. **A provider is missing or failing at call time** — with one provider
+   visible, the tables below still configure it; with neither, fall back
+   to whatever retrieval tool the environment offers.
+3. **The task is out of scope** — private/login-gated sources, recurring
+   monitoring, URL-safety verdicts, live price/inventory lookups (next
+   section).
 
 Two complementary search APIs. Measured per-query result overlap (domain
 Jaccard) averages 0.22, so they cover different corners of the web — routing
@@ -36,26 +64,6 @@ release or pricing change.
 - **Exa** — semantic search with published dates on about half of results,
   strong on primary/official sources and academic pages, plus structured JSON,
   LLM snippets, and `/contents` for indexed or live-fetched URLs.
-
-## Default trigger — this skill before any browser
-
-Whenever Tavily and Exa are both visible and callable in the current
-environment, this skill is the default path for **every public-web
-retrieval task**: searches, news checks, research passes, and fetching
-known URLs. Load it before reaching for browser automation, WebSearch, or
-WebFetch — the routed APIs are faster, cheaper, and return cleaner text
-than a browser session, and routing exists precisely because picking the
-wrong provider loses half the relevant sources.
-
-Bypass this skill only when:
-
-1. **The user explicitly names another method** ("open the browser",
-   "用浏览器打开", "use WebSearch", "don't call the search APIs") — an
-   explicit user choice always wins.
-2. **A provider is missing or failing** — with only one provider visible,
-   the tables below still configure it; with neither, fall back to
-   whatever retrieval tool the environment offers.
-3. **The task is out of scope** — see the boundaries in the next section.
 
 ## Scope and pre-flight
 
@@ -264,6 +272,10 @@ do:
    an API call. When Tavily and Exa are both visible, route the lookup
    through this skill and keep the browser for tasks that genuinely need
    interaction — login flows, screenshots, clicking a UI.
+10. **Sending test searches before the real query.** Visibility in the
+    tool list is the trigger condition; probing both providers "to be
+    safe" burns quota and adds latency without new information. Handle
+    failures reactively through the fallback rules instead.
 
 ## References
 
