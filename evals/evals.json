@@ -116,6 +116,28 @@
         "Does not claim Tavily fast preserves basic-mode quality",
         "Requires validation of the candidate links"
       ]
+    },
+    {
+      "id": 12,
+      "prompt": "Both Tavily and Exa tools are available in this session. Quickly check what the developer community thinks of the newest Python release.",
+      "expected_output": "Route through this skill to Tavily for community threads instead of opening a browser or a generic web tool.",
+      "files": [],
+      "expectations": [
+        "Treats the skill as the default path for public-web retrieval when both providers are visible",
+        "Does not choose browser automation or generic WebSearch/WebFetch first",
+        "Selects Tavily basic for community opinion discovery"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "I have both search APIs configured, but this time open the page at https://example.com/post in the browser and read it yourself.",
+      "expected_output": "Follow the user's explicit browser request even though both providers could fetch the URL.",
+      "files": [],
+      "expectations": [
+        "Recognizes the explicit user instruction as the bypass condition for the default trigger",
+        "Does not silently substitute Tavily Extract or Exa Contents for the requested browser",
+        "May note that the skill would otherwise route this as a known-URL fetch"
+      ]
     }
   ]
 }

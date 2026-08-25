@@ -1,6 +1,24 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-08-25
+
+- Made the skill the default router: whenever Tavily and Exa are both
+  visible in the tool list, every public-web search or known-URL fetch goes
+  through this skill; browser, WebSearch, and WebFetch become fallbacks
+  unless the user explicitly names another method
+- Rewrote the frontmatter description for trigger reliability (the previous
+  wording under-triggered: models reached for a browser instead)
+- Added a default-trigger section and an "opening a browser when both
+  providers are available" common mistake to SKILL.md
+- READMEs: added provider websites, dashboards, and free-tier quota
+  pointers (verified against the 2026-08 references)
+- READMEs: the copy-to-AI install prompt now live-checks both services,
+  fixes or installs them (asking the user for keys), and installs the skill
+  only after both are verified callable
+- Added eval cases 12–13 covering the default trigger and the
+  explicit-user-override bypass
+
+## 1.1.0 — 2026-08-18
 
 - Fixed repository validation so placeholders no longer trigger leak warnings
 - Repository validation now fails on metadata, reference, or leak errors
