@@ -2,21 +2,23 @@
 name: tavily-exa-router
 description: >
   DEFAULT for all public-web search and fetch — use this FIRST, whenever
-  Tavily and Exa are both visible in the tool list, before any
-  provider-specific Tavily/Exa skill, browser, WebSearch, or WebFetch.
-  Triggers on any phrasing of a web task: search, find, look up, check
-  the news, research, 搜一下 / 查一下 / 帮我搜 / 最新消息, or fetch and
-  read a known URL. It decides the provider (Tavily vs Exa), mode, and
-  parameters by query type (news, papers, community opinions, reviews,
-  company research, Chinese content), plus cost/latency tradeoffs and
-  known-URL retrieval via Tavily Extract / Exa Contents. No pre-checks
-  needed — visibility in the tool list is the trigger. Skip only when the
+  Tavily and Exa are both available in any form (MCP tools, skills, CLI,
+  or configured API keys), before any provider-specific Tavily/Exa skill,
+  browser, WebSearch, or WebFetch. Triggers on any phrasing of a web
+  task: search, find, look up, check the news, research, 搜一下 / 查一下
+  / 帮我搜 / 最新消息, or fetch / read / grab a known URL — even a plain
+  "read this page" that looks like a one-step WebFetch job. It decides
+  the provider (Tavily vs Exa), mode, and parameters by query type
+  (news, papers, community opinions, reviews, company research, Chinese
+  content), plus cost/latency tradeoffs and known-URL retrieval via
+  Tavily Extract / Exa Contents. No pre-checks needed — provider
+  availability in the environment is the trigger. Skip only when the
   user explicitly names another tool or method, or for private/
-  login-gated sources, recurring monitoring, URL-safety verdicts, or live
-  price and inventory lookups.
+  login-gated sources, recurring monitoring, URL-safety verdicts, or
+  live price and inventory lookups.
 license: MIT
 metadata:
-  version: "1.2.1"
+  version: "1.2.2"
   evidence-tested: "2026-08"
 ---
 
@@ -24,15 +26,22 @@ metadata:
 
 ## Default trigger — read before calling any web tool
 
-Whenever Tavily and Exa are both visible in the current tool list, this
-skill is the default path for **every public-web retrieval task**:
-searches, news checks, research passes, and fetching known URLs. Before
-calling a browser, WebSearch, WebFetch, or a provider-specific
-Tavily/Exa tool, route through this skill — the two indexes overlap by
-only 22%, so picking the wrong provider loses half the relevant sources.
+Whenever Tavily and Exa are both available in this environment — as MCP
+tools, skills, CLIs, or configured API keys — this skill is the default
+path for **every public-web retrieval task**: searches, news checks,
+research passes, and fetching known URLs. Before calling a browser,
+WebSearch, WebFetch, or a provider-specific Tavily/Exa tool, route
+through this skill — the two indexes overlap by only 22%, so picking the
+wrong provider loses half the relevant sources.
 
-The trigger condition is **visibility in the tool list — nothing else**.
-Do not send probe or test requests to "verify" a provider before the real
+A plain "read/fetch this URL" request is still a routing task, even when
+it looks like a one-step job for WebFetch or a browser: Tavily Extract
+and Exa Contents return cleaner, more complete text for many pages, and
+the fetch matrix below says which endpoint to try first. Consult this
+skill before handing any URL to a generic fetcher.
+
+The trigger condition is **provider availability — nothing else**. Do
+not send probe or test requests to "verify" a provider before the real
 query: that burns credits and latency for no information. Route the
 actual query directly; if a call then fails, the fallback rules below say
 exactly what to do.

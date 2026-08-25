@@ -1,10 +1,10 @@
 # tavily-exa-router
 
-[中文](README.md) · Current version v1.2.1 · Evidence tested 2026-08
+[中文](README.md) · Current version v1.2.2 · Evidence tested 2026-08
 
 A search-routing **skill for AI coding assistants** (Claude Code and friends): when a task has to choose between the Tavily and Exa search APIs, it says which one to pick and how to configure it, by query type. Every rule is backed by measurements from 2026-08-18 — not by preference.
 
-As of v1.2.0, whenever **both Tavily and Exa tools are visible** in the environment, this skill is the **default entry point** for public-web retrieval — searches, news checks, research, and known-URL fetches all go through it first; the browser and generic WebFetch/WebSearch are fallbacks unless the user explicitly asks for them. The trigger condition is visibility in the tool list alone — **no pre-checks or probe requests needed**.
+As of v1.2.0, whenever **both Tavily and Exa are available** in the environment — as MCP tools, skills, CLIs, or configured API keys — this skill is the **default entry point** for public-web retrieval: searches, news checks, research, and known-URL fetches all go through it first; the browser and generic WebFetch/WebSearch are fallbacks unless the user explicitly asks for them. The trigger condition is provider availability alone — **no pre-checks or probe requests needed**.
 
 ## Why it exists
 

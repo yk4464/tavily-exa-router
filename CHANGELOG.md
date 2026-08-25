@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.2 — 2026-08-26
+
+- Broadened the trigger condition from "visible in the tool list" to
+  "available in any form (MCP tools, skills, CLI, or configured API
+  keys)" — in skill/CLI-based environments the old wording read as
+  "not triggered" (found in live trigger testing)
+- Strengthened the known-URL fetch claim: a plain "read this page"
+  request that looks like a one-step WebFetch job still routes through
+  this skill (the one failure mode in the 4-prompt trigger test)
+- Trigger test on 4 realistic prompts (search + community, English
+  research, known-URL fetch, news check): 3/4 loaded the skill first;
+  the fetch case failed and prompted this fix
+- Re-tested the fetch scenario after the fix: 2/2 prompts loaded the
+  skill first and routed to Exa /contents (no WebFetch, no browser);
+  6/6 fresh-session triggers overall
+
 ## 1.2.1 — 2026-08-26
 
 - Fixed runtime over-checking: the trigger condition is visibility in the
