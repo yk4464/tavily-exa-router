@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-08-26
+
+- Restructured SKILL.md into directive form: imperative rules, tables,
+  and a consolidated 12-item "Never" list; removed persuasive prose
+  (why-to-use arguments, benefit paragraphs, methodology narration)
+- All routing rules, measured numbers, parameter tables, 13-site fetch
+  matrix results, fallback rules, and reference pointers unchanged
+
 ## 1.2.2 — 2026-08-26
 
 - Broadened the trigger condition from "visible in the tool list" to

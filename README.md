@@ -1,6 +1,6 @@
 # tavily-exa-router
 
-[English](README_EN.md) · 当前版本 v1.2.2 · 证据测于 2026-08
+[English](README_EN.md) · 当前版本 v1.3.0 · 证据测于 2026-08
 
 一个给 AI 编码助手（Claude Code 等）用的**搜索路由 skill**：当任务需要在 Tavily 和 Exa 两个搜索 API 之间做选择时，按查询类型直接给出选哪个、配什么参数。所有规则都由 2026-08-18 的实测数据支撑，不是主观偏好。
 

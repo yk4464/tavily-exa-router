@@ -1,6 +1,6 @@
 # tavily-exa-router
 
-[中文](README.md) · Current version v1.2.2 · Evidence tested 2026-08
+[中文](README.md) · Current version v1.3.0 · Evidence tested 2026-08
 
 A search-routing **skill for AI coding assistants** (Claude Code and friends): when a task has to choose between the Tavily and Exa search APIs, it says which one to pick and how to configure it, by query type. Every rule is backed by measurements from 2026-08-18 — not by preference.
 
