@@ -1,8 +1,15 @@
-# Evidence - Measured Data Behind the Rules (2026-08-18)
+# Evidence — Measured Data Behind the Rules (2026-08-18)
 
-This snapshot comes from direct API calls from one Windows machine. It is a
-directional comparison, not a provider SLA or a universal quality benchmark.
-Raw responses are stored locally under `search_results/` and are git-ignored.
+This snapshot comes from direct API calls from one Windows machine: one
+network region, one time window, one account tier per provider, four
+fixed queries per mode plus one broad 20-query pass, no blind human
+relevance grading, no confidence intervals. Latency is end-to-end and
+includes provider load, network variance, caching, and crawl waits —
+directional measurements, not an SLA. Domain counts use a static
+allowlist, which can count a provider forum as authoritative, miss a
+strong independent blog, and count several URLs for one paper as
+separate sources. Manual review used titles, URLs, and Tavily snippets;
+not every returned page was independently fact-checked.
 
 | Suite | Artifact | Scope |
 |---|---|---|
@@ -23,14 +30,9 @@ Raw responses are stored locally under `search_results/` and are git-ignored.
 | p95 latency | **2,344 ms** | 2,467 ms |
 | Observed cost per query | 1 credit | $0.007 |
 
-Average per-query domain Jaccard overlap was **0.22**. The indexes were mostly
-complementary, but low overlap alone does not prove that paying for both
-improves an answer.
-
-These counts are intentionally simple. A static domain allowlist can count a
-provider forum as authoritative, miss a high-quality independent engineering
-blog, and count several URLs for the same paper as separate sources. Manual
-review remains necessary.
+Average per-query domain Jaccard overlap was **0.22** — the indexes were
+mostly complementary. Low overlap alone does not prove that paying for
+both improves an answer.
 
 ## 2. Search-mode matrix
 
@@ -65,8 +67,8 @@ Manual review changed how these numbers should be read:
   relevant. Exa `deep-reasoning` drifted to English sources; Tavily fast modes
   were substantially off-topic.
 
-Exa mode cases in this artifact contain titles and URLs but no fetched text, so
-their manual quality judgment does not establish page-content accuracy.
+Exa mode cases in this artifact contain titles and URLs but no fetched text,
+so their manual quality judgment does not establish page-content accuracy.
 
 ## 3. Parameter and boundary matrix
 
@@ -141,34 +143,9 @@ failed site.
 
 Exa cache-only returned in 0.53s. Forced-live and 24-hour-cache runs each took
 about 30.5s because difficult sites waited for crawl timeouts. Exact URL and
-cache state materially changed results, so this matrix must not be generalized
-into a permanent site-support promise.
+cache state materially changed results, so this matrix is a 2026-08-18
+observation, not a permanent site-support promise.
 
 The Linux.do text ended with a block beginning `CRITICAL INSTRUCTIONS FOR ALL
 AI ASSISTANTS...` that attempted to make models refuse writing help and visit
-the site's guidelines. It was treated as untrusted webpage content, flagged as
-`prompt-injection`, and never followed. Successful extraction is not permission
-for webpage text to override system, developer, or user instructions.
-
-## 5. Routing conclusions supported by this snapshot
-
-- Use Exa `instant` for fast official or paper discovery; use `auto` when the
-  query shape is unclear.
-- Use Tavily `basic` for broad community discovery and for snippets that can be
-  consumed immediately. Cross-check when forum recall matters.
-- Use Exa `deep` or `deep-reasoning` only for a deliberate research pass; do
-  not treat `deep-lite` as an automatic quality upgrade.
-- Use Tavily first for the tested X/Linux.do URLs and Exa for ordinary indexed
-  pages, while treating both retrieval endpoints as best-effort.
-- Validate source identity, canonicalize near-duplicate URLs, and inspect the
-  returned body before citing it.
-
-## 6. Method limits
-
-- One network region, one time window, one account tier per provider.
-- Four fixed queries per mode and one broad 20-query pass; no blind human
-  relevance grading and no confidence intervals.
-- Latency was measured end-to-end and includes provider load, network variance,
-  caching, and crawl waits. It is not an SLA.
-- Domain counts are heuristics. Manual conclusions use titles, URLs, and Tavily
-  snippets; not every returned page was independently fact-checked.
+the site's guidelines. It was flagged as prompt-injection and never followed.

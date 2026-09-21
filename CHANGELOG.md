@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.1 — 2026-09-21
+
+- Replaced inline "one-off measurement" caveats across SKILL.md, exa.md,
+  and tavily.md with explicit dated pointers into `references/evidence.md`
+  §1–§4; tightened assertions to match the evidence ("must not" for
+  category+date/excludeDomains, "drift, not a contract" for boundary
+  responses like `max_results: 21`, `maxAgeHours: 721`, 1,501-char queries)
+- evidence.md: moved method limits to the opening paragraph; dropped the
+  §5 conclusions list that duplicated SKILL.md's routing table
+- Precision fixes: `evidence-tested` dated exactly (2026-08-18); repaired
+  two lost newlines that glued a §3 heading and a JSON code fence to
+  surrounding text; fixed a dangling §6 pointer left by the renumbering
+
 ## 1.3.0 — 2026-08-26
 
 - Restructured SKILL.md into directive form: imperative rules, tables,
