@@ -4,6 +4,15 @@ Docs: https://docs.tavily.com/documentation/api-reference/endpoint/search
 Auth: `Authorization: Bearer $TAVILY_API_KEY` on all endpoints.
 Base: `https://api.tavily.com`
 
+## Contents
+
+- Endpoints
+- /search parameters
+- Response fields that matter
+- /extract (parameters + measured behavior)
+- Recipes
+- Pricing (2026-08)
+
 ## Endpoints
 
 | Endpoint | Purpose | Notes |

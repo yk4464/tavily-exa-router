@@ -29,6 +29,17 @@ else:
     print("description: MISSING")
     errors.append("frontmatter description is missing")
 
+# Placeholder safety: skill loaders expand $<digit> tokens as positional
+# arguments, silently deleting prices like "$0.007" from the loaded body.
+# Write "USD 0.007" instead. ($NAME-style env vars are unaffected.)
+unsafe = [f"{i}: {line.strip()[:80]}" for i, line in enumerate(content.splitlines(), 1)
+          if re.search(r"\$\d", line)]
+print(f"placeholder-safe body (no $<digit>): {'OK' if not unsafe else 'VIOLATIONS'}")
+for item in unsafe:
+    print(f"  line {item}")
+if unsafe:
+    errors.append("SKILL.md contains $<digit> tokens that loaders expand away; use USD forms")
+
 # Leak check across public text files. Patterns require a concrete username or
 # credential value, so documentation placeholders and this file do not match.
 patterns = {

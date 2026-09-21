@@ -18,6 +18,14 @@ not every returned page was independently fact-checked.
 | Parameters | `comprehensive_parameters.json` | 78 boundary, conflict, output, and semantic checks |
 | Known-URL retrieval | `comprehensive_extract.json` | 54 cases, including a 13-site fetch matrix |
 
+## Contents
+
+- §1 Broad 20-query comparison — volume, dates, latency, cost, domain overlap
+- §2 Search-mode matrix — 10 modes × 4 fixed intents, plus manual review
+- §3 Parameter and boundary matrix — 78 cases (Tavily, then Exa)
+- §4 Known-URL retrieval matrix — 13 sites × both providers (2026-08-18)
+- §4a Spot check, 2026-09-21 — 5 drift-prone sites re-run
+
 ## 1. Broad 20-query comparison
 
 | Metric | Tavily | Exa |

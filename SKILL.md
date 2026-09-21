@@ -18,7 +18,7 @@ description: >
   live price and inventory lookups.
 license: MIT
 metadata:
-  version: "1.3.2"
+  version: "1.3.3"
   evidence-tested: "2026-09-21"
 ---
 
@@ -128,11 +128,11 @@ Exa `type`:
 
 | Type | Median | Cost | Use |
 |---|---|---|---|
-| `instant` | 0.97s | $0.007 | Fastest useful default; strong on official/academic links. |
-| `auto` | 1.78s | $0.007 | Safest default when the query shape is unclear. |
-| `deep` | 5.3s | $0.012 | Deliberate research passes only. |
-| `deep-reasoning` | 12.7s | $0.015 | English community recall; drifts to English on strict Chinese queries. |
-| `deep-lite` | 6.0s | $0.012 | No consistent gain over `auto` — don't use as an upgrade. |
+| `instant` | 0.97s | USD 0.007 | Fastest useful default; strong on official/academic links. |
+| `auto` | 1.78s | USD 0.007 | Safest default when the query shape is unclear. |
+| `deep` | 5.3s | USD 0.012 | Deliberate research passes only. |
+| `deep-reasoning` | 12.7s | USD 0.015 | English community recall; drifts to English on strict Chinese queries. |
+| `deep-lite` | 6.0s | USD 0.012 | No consistent gain over `auto` — don't use as an upgrade. |
 
 ## Parameters
 
@@ -174,7 +174,7 @@ POST https://api.exa.ai/search
   requested content type; summaries and results beyond 10 cost extra —
   request only what's needed.
 - Auth: `x-api-key: $EXA_API_KEY`. Read `publishedDate` and
-  `costDollars` from responses; prices moved $5→$7/1k in 2026-03, so
+  `costDollars` from responses; prices moved 5→7 USD/1k in 2026-03, so
   check `costDollars` when cost matters.
 
 Parameter snapshot 2026-08-18: if a call rejects a parameter shown here,

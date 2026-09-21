@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.3 — 2026-09-21
+
+- Harness-compat fix: replaced six `$<digit>` price strings in SKILL.md
+  (`$0.007`, `$5→$7/1k`, …) with `USD …` forms. Skill loaders expand
+  `$0`-style tokens as positional arguments, so the loaded body showed
+  corrupted costs (`.007`, `→/1k`) while the on-disk file looked fine.
+  Found by loading the skill and diffing against disk;
+  `tests/validate_repo.py` now rejects the pattern, and CONTRIBUTING.md
+  documents the rule
+- Added tables of contents to the three >100-line references
+  (evidence.md, exa.md, tavily.md), per the official skill-authoring
+  guidance
+- Best-practices comparison (official authoring guide, anthropics/skills
+  skill-creator, Linux.do #1424073, X practitioner guides): description
+  length, <500-line body, one-level references, gotchas section, and
+  script-backed checks already conform. The description stays imperative
+  on purpose — that wording was trigger-tested 6/6; third-person
+  restyling is rejected as regression risk without a new trigger run
+
 ## 1.3.2 — 2026-09-21
 
 - Spot re-check of the five most drift-prone fetch targets

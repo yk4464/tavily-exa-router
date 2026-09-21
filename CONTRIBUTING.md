@@ -8,5 +8,9 @@ advice is traceable, so please keep it that way.
 - Parameter/pricing changes: include the date you verified them and a link
   to the vendor doc.
 - New routing rules: include the test or sources that justify them.
+- Never write `$` followed by a digit in SKILL.md (e.g. `$0.007`) — skill
+  loaders expand `$0`-style tokens as argument placeholders and delete them
+  from the loaded body. Write `USD 0.007` instead; `tests/validate_repo.py`
+  rejects the pattern.
 - Re-testing the existing rules against current APIs is the most valuable
   contribution of all.

@@ -4,6 +4,15 @@ Docs: https://exa.ai/docs/reference/search (moved from docs.exa.ai)
 Auth: `x-api-key: $EXA_API_KEY` (or `Authorization: Bearer`).
 Base: `https://api.exa.ai`
 
+## Contents
+
+- /search — top-level parameters (+ deprecated/removed fields)
+- contents options (text / highlights / summary / extras / subpages / maxAgeHours)
+- Response fields that matter
+- outputSchema example (verified)
+- Recipes
+- Pricing (2026-08)
+
 ## /search — top-level parameters
 
 | Parameter | Values / default | Notes |
