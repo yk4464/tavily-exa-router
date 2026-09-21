@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.3.2 — 2026-09-21
+
+- Spot re-check of the five most drift-prone fetch targets
+  (`references/evidence.md` §4a): Tavily Extract unchanged (Linux.do, X,
+  Bilibili usable; Reddit still fails; the Linux.do prompt-injection tail
+  persists). Exa Contents improved on Linux.do (live and 24h-cache now
+  return usable text; the 2026-08-18 live timeout no longer holds) and
+  regressed once on Bilibili forced-live while 24h-cache still worked —
+  SKILL.md's known-URL matrix wording updated to match; routing
+  conclusions unchanged
+- Pricing re-verified against both vendors' public pricing pages: Exa
+  ($7/1k search, $1/1k contents per type, $12–15/1k deep, free tier) and
+  Tavily ($0.008/credit PAYG, 1,000 free credits/month) match the 2026-08
+  snapshot; local smoke test 6/6 (Tavily basic still 1 credit, Exa auto
+  still $0.007, company+date still HTTP 400)
+- community-feedback.md: noted the 2026-09-07 independent reproduction of
+  exa-mcp-server #396 and the proposed fix PR #430; all seven tracked
+  provider issues remain open
+- Frontmatter `evidence-tested` moved to 2026-09-21 (spot recheck; the
+  full 2026-08-18 baseline stands)
+
 ## 1.3.1 — 2026-09-21
 
 - Replaced inline "one-off measurement" caveats across SKILL.md, exa.md,

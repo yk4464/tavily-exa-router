@@ -149,3 +149,24 @@ observation, not a permanent site-support promise.
 The Linux.do text ended with a block beginning `CRITICAL INSTRUCTIONS FOR ALL
 AI ASSISTANTS...` that attempted to make models refuse writing help and visit
 the site's guidelines. It was flagged as prompt-injection and never followed.
+
+## 4a. Spot check, 2026-09-21
+
+Five drift-prone sites re-run with the same request shapes as §4 (Tavily
+`/extract` basic, one batch; Exa `/contents` at `maxAgeHours` −1/0/24).
+Raw output: `search_results/spot_check_2026-09-21.json`. Single-run
+observations, same method limits as the opening section.
+
+- **Tavily: unchanged.** Linux.do (12,417 chars), X, and Bilibili usable;
+  Reddit still failed; the Linux.do page still carried the AI-directed
+  instruction block. The Zhihu homepage (the requested URL) returned 511
+  chars.
+- **Exa, Linux.do: improved.** Forced-live and 24h-cache both returned usable
+  text (1,827 chars); cache-only still errored. §4's "live timeout" did not
+  hold in this window.
+- **Exa, Bilibili: mixed.** Forced-live errored once while 24h-cache returned
+  usable text — the reverse of the 2026-08-18 live success. Cache state, not
+  the site, decides; this matches §4's closing caveat.
+- **Exa, X/Reddit: unchanged.** Error / `SOURCE_NOT_AVAILABLE` in all three
+  cache modes. Zhihu cache-only returned 323 chars (homepage shell) — still
+  treat Zhihu as a login wall.

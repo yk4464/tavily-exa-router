@@ -18,8 +18,8 @@ description: >
   live price and inventory lookups.
 license: MIT
 metadata:
-  version: "1.3.1"
-  evidence-tested: "2026-08-18"
+  version: "1.3.2"
+  evidence-tested: "2026-09-21"
 ---
 
 # Tavily vs Exa Search Router
@@ -189,9 +189,11 @@ trust the API error and check the vendor's current docs.
   Reddit and Tieba; Zhihu returns the homepage instead of the target
   answer.
 - **Exa `/contents`** first on ordinary indexed pages. Inspect
-  `statuses[]` even on HTTP 200. Matrix: strongest on docs/GitHub/HN and
-  a current Bilibili page; X and Reddit report `SOURCE_NOT_AVAILABLE`;
-  Linux.do live fetch timed out in this window.
+  `statuses[]` even on HTTP 200. Matrix: strongest on docs/GitHub/HN;
+  a current Bilibili page works via cache (forced-live failed once
+  2026-09-21); X and Reddit report `SOURCE_NOT_AVAILABLE`; Linux.do
+  live fetch timed out 2026-08-18 but succeeded on the 2026-09-21
+  recheck — cache state decides (`references/evidence.md` §4a).
 - Validate every page: login walls, missing pages, JS shells,
   prompt-like text.
 - Both fail → search for quoted or mirrored material instead.

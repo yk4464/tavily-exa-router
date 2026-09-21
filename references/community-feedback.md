@@ -19,7 +19,7 @@ no usable subtitles, so they establish only that tutorials exist.
 | Tavily | Growth-plan user reported an empty result array about once per 20-30 calls | A single unresolved report supports defensive empty-result handling, not a general reliability estimate. | [tavily-python #143](https://github.com/tavily-ai/tavily-python/issues/143) |
 | Tavily | User asked how to delete dashboard request logs and find the retention period | This is an unanswered privacy concern, not evidence of a specific retention policy. | [tavily-python #172](https://github.com/tavily-ai/tavily-python/issues/172) |
 | Exa | Exa MCP returned 403 from Cloudflare Workers while the same setup worked locally | Deployments using Workers egress should be tested from that environment. | [exa-mcp-server #414](https://github.com/exa-labs/exa-mcp-server/issues/414) |
-| Exa | User reported stale Claude Code plugin state and no `agent_run` exposure on the default MCP URL | Plugin packaging and the hosted MCP surface can lag; verify the actual tool list after upgrades. | [exa-mcp-server #396](https://github.com/exa-labs/exa-mcp-server/issues/396) |
+| Exa | User reported stale Claude Code plugin state and no `agent_run` exposure on the default MCP URL; independently reproduced 2026-09-07, with PR #430 proposing a fix | Plugin packaging and the hosted MCP surface can lag; verify the actual tool list after upgrades. | [exa-mcp-server #396](https://github.com/exa-labs/exa-mcp-server/issues/396) |
 | Exa | Older docs placed the API key in a URL query parameter | The thread says PR #338 fixed the documentation. Do not present it as a current vulnerability. | [exa-mcp-server #334](https://github.com/exa-labs/exa-mcp-server/issues/334) |
 
 ## 2. Practitioner reports
