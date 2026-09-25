@@ -1,6 +1,6 @@
 # tavily-exa-router
 
-[中文](README.md) · Current version v1.3.0 · Evidence tested 2026-08
+[中文](README.md) · Current version v1.3.4 · Evidence tested 2026-08-18 (spot recheck 2026-09-21)
 
 A search-routing **skill for AI coding assistants** (Claude Code and friends): when a task has to choose between the Tavily and Exa search APIs, it says which one to pick and how to configure it, by query type. Every rule is backed by measurements from 2026-08-18 — not by preference.
 
@@ -55,9 +55,9 @@ Failure fallback: on timeout / 5xx retry once, then switch providers; on 429 res
 |---|---|---|---|
 | `instant` | 0.97s | $0.007 | Fastest useful default; especially strong on official and academic links |
 | `auto` | 1.78s | $0.007 | Safest general default when the query shape is unclear |
-| `deep` | 5.26s | $0.012 | Top-tier target hits; for deliberate research passes |
-| `deep-reasoning` | 12.68s | $0.015 | Best English community recall, but drifts to English on strict Chinese queries |
-| `deep-lite` | 5.99s | $0.012 | No consistent gain over `auto` |
+| `deep` | 5.3s | $0.012 | Top-tier target hits; for deliberate research passes |
+| `deep-reasoning` | 12.7s | $0.015 | Best English community recall, but drifts to English on strict Chinese queries |
+| `deep-lite` | 6.0s | $0.012 | No consistent gain over `auto` |
 
 ## Pitfalls found in testing
 
@@ -114,12 +114,12 @@ Once installed, whenever both Tavily and Exa tools are visible, public-web retri
 ```
 SKILL.md                  # The deliverable: full routing rules (for the agent to read)
 references/
-  evidence.md             # 2026-08-18 measurements (4 suites, 192 cases)
+  evidence.md             # 2026-08-18 measurements (4 suites, 192 calls; plus a 09-21 spot recheck)
   tavily.md               # Complete Tavily endpoint/parameter/pricing reference
   exa.md                  # Complete Exa endpoint/parameter/pricing reference
   community-feedback.md   # Issue-tracker and practitioner reports (~40 sources)
   provider-api-audit-…md  # API behaviors that drift outside the documented contract
-evals/evals.json          # 11 routing/scope evaluation cases
+evals/evals.json          # 13 routing/scope evaluation cases
 tests/                    # 10 test scripts (stdlib only) + usage notes
 agents/openai.yaml        # OpenAI Agents platform interface declaration
 .github/workflows/        # Monthly automated drift check

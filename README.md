@@ -1,6 +1,6 @@
 # tavily-exa-router
 
-[English](README_EN.md) · 当前版本 v1.3.0 · 证据测于 2026-08
+[English](README_EN.md) · 当前版本 v1.3.4 · 证据测于 2026-08-18（2026-09-21 抽检复核）
 
 一个给 AI 编码助手（Claude Code 等）用的**搜索路由 skill**：当任务需要在 Tavily 和 Exa 两个搜索 API 之间做选择时，按查询类型直接给出选哪个、配什么参数。所有规则都由 2026-08-18 的实测数据支撑，不是主观偏好。
 
@@ -55,9 +55,9 @@ Tavily 和 Exa 都是为 LLM 设计的搜索 API，但实测（20 个查询，�
 |---|---|---|---|
 | `instant` | 0.97s | $0.007 | 最快的有用默认，官方与学术链接特别强 |
 | `auto` | 1.78s | $0.007 | 查询形态不明确时最安全的通用默认 |
-| `deep` | 5.26s | $0.012 | 目标命中最高档，用于刻意的研究回合 |
-| `deep-reasoning` | 12.68s | $0.015 | 英文社区召回最好，但严格中文查询会漂移到英文 |
-| `deep-lite` | 5.99s | $0.012 | 相比 auto 没有稳定收益 |
+| `deep` | 5.3s | $0.012 | 目标命中最高档，用于刻意的研究回合 |
+| `deep-reasoning` | 12.7s | $0.015 | 英文社区召回最好，但严格中文查询会漂移到英文 |
+| `deep-lite` | 6.0s | $0.012 | 相比 auto 没有稳定收益 |
 
 ## 实测踩过的坑
 
@@ -114,12 +114,12 @@ git clone https://github.com/yk4464/tavily-exa-router.git ~/.claude/skills/tavil
 ```
 SKILL.md                  # 核心交付物：路由规则全文（给 agent 读）
 references/
-  evidence.md             # 2026-08-18 实测数据（4 套测试、192 个用例）
+  evidence.md             # 2026-08-18 实测数据（4 套测试、192 次调用；另有 09-21 抽检）
   tavily.md               # Tavily 端点/参数/定价完整参考
   exa.md                  # Exa 端点/参数/定价完整参考
   community-feedback.md   # 约 40 个来源的 issue tracker 与从业者报告
   provider-api-audit-…md  # 超出官方文档契约的 API 行为记录
-evals/evals.json          # 11 条路由/scope 评测用例
+evals/evals.json          # 13 条路由/scope 评测用例
 tests/                    # 10 个测试脚本（仅标准库）+ 用法说明
 agents/openai.yaml        # OpenAI Agents 平台接口声明
 .github/workflows/        # 每月自动漂移检查

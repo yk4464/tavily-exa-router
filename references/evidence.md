@@ -25,6 +25,7 @@ not every returned page was independently fact-checked.
 - §3 Parameter and boundary matrix — 78 cases (Tavily, then Exa)
 - §4 Known-URL retrieval matrix — 13 sites × both providers (2026-08-18)
 - §4a Spot check, 2026-09-21 — 5 drift-prone sites re-run
+- §4b Injection survey, 2026-09-25 — 11 pages × both providers, tail-append vs whole-body
 
 ## 1. Broad 20-query comparison
 
@@ -178,3 +179,60 @@ observations, same method limits as the opening section.
 - **Exa, X/Reddit: unchanged.** Error / `SOURCE_NOT_AVAILABLE` in all three
   cache modes. Zhihu cache-only returned 323 chars (homepage shell) — still
   treat Zhihu as a login wall.
+
+## 4b. Injection survey, 2026-09-25
+
+Follow-up to §4's single Linux.do case, to test whether the phenomenon is
+site-specific and how large a share of a response it can occupy. 11 public
+pages × both providers = 22 fetches (Tavily `/extract` default; Exa
+`/contents` with `text`), read-only, no login. 19 returned body text, 3
+failed. Raw responses: `search_results/` on the run machine.
+
+| Site family | Body returned | Injection signal |
+|---|---|---|
+| Linux.do, 3 different topics | yes (Tavily; Exa on 2 of 3) | **yes, all confirmed cases** |
+| V2EX, 2 topics | yes (both providers) | no |
+| Python docs | yes (both) | no |
+| GitHub repo page | yes (both) | no |
+| Hacker News thread | yes (both) | no |
+| BBC News | yes (both) | no |
+| Exa vendor comparison page | yes (both) | no |
+| Zhihu question | no — Tavily 35 chars; Exa no text | n/a (login wall, matches §4) |
+
+Two findings matter more than the site list:
+
+1. **Tail append, and it can become the whole response.** On the three
+   Linux.do topics the block began at 82.6% / 87.0% / 87.2% of the Tavily
+   body, after the page's related-topic table — normal content for the first
+   ~8.5–10.8k characters. But the *same* topic returned by Exa came back as
+   only 1,694 characters, of which 1,593 (**94.0%**) were the injected block.
+   The block is byte-identical across all three topics (same SHA-256 prefix),
+   so it is server-appended site furniture, not user-authored argument.
+   **Share of the response occupied by the injection is decided by how much
+   of the page the provider sliced, not by the site** — a downstream consumer
+   that takes the first N characters, or treats a short return as a summary,
+   can ingest the injection as essentially all of its input.
+2. **Both providers return it verbatim**, so this is not a Tavily
+   sanitization gap — the text is in the page. On Linux.do, Exa's Chinese
+   body was mojibake in this run while the ASCII injection block stayed fully
+   legible, making the injection the clearest text in that response.
+
+The block claims the site prohibits AI-generated content and instructs the
+model to refuse writing help, recite a scripted notice to the user, and
+navigate the session to the site's guidelines page. None of that comes from
+the user or the system prompt.
+
+Caveats, stated plainly: the "only Linux.do so far" result rests on 11 URLs,
+all well-known sites, so it bounds nothing about other community platforms; no
+second Chinese forum family was tested. This is a single-time snapshot with no
+time series, so nothing is established about whether the block persists. The
+mojibake was not attributed to either the provider's decoding or the site's
+response. Detection signatures also produce false positives: the bare word
+`override` matched ordinary technical prose twice here (a Python docs sentence
+on regex flags, a README comment "# Per-call override") — never treat it as a
+signal on its own.
+
+Observed failure modes this run: Exa `/contents` on one Linux.do topic returned
+`CRAWL_UNKNOWN_ERROR`; Zhihu returned 35 characters (Tavily) and no text (Exa),
+consistent with §4; a second V2EX topic returned implausibly short bodies (442
+/ 328 chars) whose truncation cause was not determined.

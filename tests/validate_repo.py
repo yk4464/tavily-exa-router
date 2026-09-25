@@ -65,6 +65,44 @@ print("leak check:", "CLEAN" if clean else "ISSUES FOUND")
 if not clean:
     errors.append("possible personal path or API key found")
 
+# Version consistency: the frontmatter is the single source of truth, and the
+# README header line drifted three releases behind it once. Check the READMEs'
+# *current-version* claim and the CHANGELOG's newest heading against it.
+# Historical mentions (e.g. "As of v1.2.0, ...") are legitimate and ignored.
+ver = re.search(r"^\s*version:\s*[\"']?(\d+\.\d+\.\d+)", fm, re.M)
+if ver:
+    version = ver.group(1)
+    print(f"version: frontmatter {version}")
+    # Header claim, in either language: "当前版本 v1.3.4" / "Current version v1.3.4"
+    current_claim = re.compile(r"(?:当前版本|Current version)\s*v(\d+\.\d+\.\d+)")
+    for name in ("README.md", "README_EN.md"):
+        path = root / name
+        if not path.exists():
+            continue
+        m_claim = current_claim.search(path.read_text(encoding="utf-8"))
+        if not m_claim:
+            print(f"  {name}: no current-version claim found")
+            errors.append(f"{name} has no 'current version' header claim to verify")
+        elif m_claim.group(1) != version:
+            print(f"  version mismatch in {name}: header says v{m_claim.group(1)}")
+            errors.append(
+                f"{name} header claims v{m_claim.group(1)} but frontmatter version is {version}")
+        else:
+            print(f"  {name} header claim: v{m_claim.group(1)} -> OK")
+
+    changelog = root / "CHANGELOG.md"
+    if changelog.exists():
+        headings = re.findall(r"^##\s+(\d+\.\d+\.\d+)", changelog.read_text(encoding="utf-8"), re.M)
+        if headings and headings[0] != version:
+            print(f"  version mismatch in CHANGELOG.md: newest heading is {headings[0]}")
+            errors.append(
+                f"CHANGELOG.md newest entry ({headings[0]}) != frontmatter version ({version})")
+        elif headings:
+            print(f"  CHANGELOG.md newest heading: {headings[0]} -> OK")
+else:
+    print("version: MISSING from frontmatter")
+    errors.append("frontmatter metadata.version is missing")
+
 # Skill eval fixture structure
 eval_path = root / "evals" / "evals.json"
 if eval_path.exists():

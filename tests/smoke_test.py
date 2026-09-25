@@ -84,5 +84,46 @@ except urllib.error.HTTPError as e:
 except Exception as e:  # noqa: BLE001
     check("Exa company+date still rejected (400)", False, str(e))
 
+# 5. Documented pricing still holds. MAINTENANCE.md lists prices as the
+# fastest-rotting facts in this repo, so they get their own guardrail: the
+# reference files state Exa search at $7/1k and deep modes at $12-15/1k, and
+# a silent reprice would invalidate every cost claim in SKILL.md.
+try:
+    with post("https://api.exa.ai/search",
+              {"query": "python requests library", "numResults": 10, "type": "auto"},
+              {"x-api-key": EXA_KEY}) as r:
+        d = json.load(r)
+    cost = d.get("costDollars")
+    total = cost.get("total") if isinstance(cost, dict) else cost
+    check("Exa default search still USD 0.007", total is not None and abs(total - 0.007) < 1e-9,
+          f"USD {total} (documented: 0.007)")
+except Exception as e:  # noqa: BLE001
+    check("Exa default search still USD 0.007", False, str(e))
+
+# 6. Exa deep is documented at USD 0.012 and deep-reasoning at USD 0.015.
+try:
+    with post("https://api.exa.ai/search",
+              {"query": "python requests library", "numResults": 3, "type": "deep"},
+              {"x-api-key": EXA_KEY}) as r:
+        d = json.load(r)
+    cost = d.get("costDollars")
+    total = cost.get("total") if isinstance(cost, dict) else cost
+    check("Exa deep still USD 0.012", total is not None and abs(total - 0.012) < 1e-9,
+          f"USD {total} (documented: 0.012)")
+except Exception as e:  # noqa: BLE001
+    check("Exa deep still USD 0.012", False, str(e))
+
+# 7. Tavily advanced is documented at 2 credits vs 1 for basic.
+try:
+    with post("https://api.tavily.com/search",
+              {"query": "python requests library", "max_results": 3,
+               "search_depth": "advanced", "include_usage": True},
+              {"Authorization": f"Bearer {TAVILY_KEY}"}) as r:
+        d = json.load(r)
+    credits = (d.get("usage") or {}).get("credits")
+    check("Tavily advanced still bills 2 credits", credits == 2, f"credits={credits}")
+except Exception as e:  # noqa: BLE001
+    check("Tavily advanced still bills 2 credits", False, str(e))
+
 print(f"\n{sum(results)}/{len(results)} checks passed.")
 sys.exit(0 if all(results) else 1)
