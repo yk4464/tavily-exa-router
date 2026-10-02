@@ -1,16 +1,25 @@
 # Contributing
 
-PRs welcome. Ground rule: any changed rule must come with new measurements
-(re-run the scripts in `tests/` — see `tests/README.md` for costs) or cited
-sources in `references/community-feedback.md`. This repo's value is that its
-advice is traceable, so please keep it that way.
+PRs welcome. This repo's value is traceable, reproducible evidence — keep it honest.
 
-- Parameter/pricing changes: include the date you verified them and a link
-  to the vendor doc.
-- New routing rules: include the test or sources that justify them.
-- Never write `$` followed by a digit in SKILL.md (e.g. `$0.007`) — skill
-  loaders expand `$0`-style tokens as argument placeholders and delete them
-  from the loaded body. Write `USD 0.007` instead; `tests/validate_repo.py`
-  rejects the pattern.
-- Re-testing the existing rules against current APIs is the most valuable
-  contribution of all.
+**Most valuable contribution:** Re-testing existing rules against live APIs with scripts in `tests/` (costs listed in `tests/README.md`) to catch drift.
+
+## Ground rules
+
+- **Evidence first**: any rule change must include fresh measurements (re-run `tests/` scripts) or cited sources in `references/community-feedback.md`.
+- **Pricing & parameters**: state the verification date and link directly to official vendor documentation.
+- **USD syntax**: never write `$` followed by a digit in `SKILL.md` (e.g. `$0.007`) — skill loaders treat `$0`-style tokens as placeholders and strip them. Use `USD 0.007` instead. `tests/validate_repo.py` enforces this.
+
+## Pre-submission checklist
+
+Run these checks before opening a PR:
+
+1. [ ] `python tests/validate_repo.py` passes all checks locally (zero cost, stdlib only).
+2. [ ] Docs parity: changes to `README.md` (Chinese) are mirrored in `README_EN.md` (English) with matching sections, tables, and facts.
+3. [ ] Evidence & changelog: updated rules or metrics include raw measurement data or cited sources, with rationale documented in `CHANGELOG.md`.
+4. [ ] Semver alignment: version bumps follow `MAINTENANCE.md` across all 4 locations:
+   - `SKILL.md` frontmatter (`metadata.version`)
+   - `README.md` header badge
+   - `README_EN.md` header badge
+   - `CHANGELOG.md` latest heading
+5. [ ] No `$0` placeholders: verified no `$`+digit patterns introduced into `SKILL.md`.

@@ -26,6 +26,7 @@ not every returned page was independently fact-checked.
 - §4 Known-URL retrieval matrix — 13 sites × both providers (2026-08-18)
 - §4a Spot check, 2026-09-21 — 5 drift-prone sites re-run
 - §4b Injection survey, 2026-09-25 — 11 pages × both providers, tail-append vs whole-body
+- §5 Full re-run, 2026-10-03 — dual-network regression, drift findings, updated latencies
 
 ## 1. Broad 20-query comparison
 
@@ -236,3 +237,129 @@ Observed failure modes this run: Exa `/contents` on one Linux.do topic returned
 `CRAWL_UNKNOWN_ERROR`; Zhihu returned 35 characters (Tavily) and no text (Exa),
 consistent with §4; a second V2EX topic returned implausibly short bodies (442
 / 328 chars) whose truncation cause was not determined.
+
+## 5. Full re-run, 2026-10-03
+
+Quarterly full regression run conducted across two distinct network egresses:
+a local Windows workstation and an Aliyun Hong Kong cloud host, using active
+paid API tiers for both providers. The test executed 172 test cases per
+endpoint (344 total runs across both environments) covering the broad 20-query
+comparison, 10 search modes, 78 parameter/boundary checks, and the 13-site
+URL retrieval matrix, alongside dedicated passes (`smoke_test.py` passing 9/9 on
+both endpoints, `speed_test`, and `community_test`).
+
+### 5.1 Broad 20-query comparison (`batch_compare.json`)
+
+Both endpoints produced consistent result counts, category splits, and domain
+overlap:
+
+| Metric | Tavily | Exa |
+|---|---:|---:|
+| Results returned | 159 | 158 |
+| Allowlisted community-domain hits | **16** | 6–7 |
+| Allowlisted authoritative-domain hits | 7 | **20–23** |
+| Results carrying a publication date | 0 | **77–84** |
+| Median latency (Local Windows) | 3,146 ms | 2,866 ms |
+| Median latency (Aliyun Hong Kong) | **644 ms** | **2,040 ms** |
+| Observed cost per query | 1 credit | $0.007 |
+
+Average per-query domain Jaccard overlap dropped to **0.12** (identical across
+both network endpoints; down from 0.22 in the 2026-08-18 baseline). The two
+indexes remain sharply differentiated and complementary.
+
+### 5.2 Search-mode latency and quality matrix
+
+Median end-to-end latencies (ms) across four passes: baseline (2026-08-18), Local
+Round 1, Local Round 2, and Aliyun Hong Kong:
+
+| Mode | 2026-08-18 Baseline | Local R1 | Local R2 | Aliyun HK | Target hits (exp/comm/auth) |
+|---|---:|---:|---:|---:|---:|
+| Tavily `ultra-fast` | 1,408 ms | 1,834 ms | 1,823 ms | 784 ms | — |
+| Tavily `fast` | 1,409 ms | 2,053 ms | 2,047 ms | 646 ms | — |
+| Tavily `basic` | 3,603 ms | 3,617 ms | 2,353 ms | 640 ms | 15 / 8 / 8 |
+| Tavily `advanced` | 4,900 ms | 4,588 ms | 2,722 ms | 772 ms | 14–15 / 7 / 7–8 |
+| Exa `instant` | 969 ms | 1,372 ms | 1,114 ms | 466 ms | 8 / 1 / 8–9 |
+| Exa `fast` | 1,153 ms | 1,832 ms | 1,148 ms | 566 ms | 9 / 2 / 10 |
+| Exa `auto` | 1,779 ms | 2,570 ms | 1,137 ms | 1,594 ms | 9–10 / 2–3 / 9–10 |
+| Exa `deep-lite` | 5,988 ms | 5,469 ms | 3,312 ms | 3,765 ms | 8–11 / 1–2 / 8–10 |
+| Exa `deep` | 5,262 ms | 11,569 ms | 9,780 ms | 8,457 ms | 14–16 / 5–8 / 8–11 |
+| Exa `deep-reasoning` | 12,677 ms | 11,755 ms | 13,536 ms | 14,261 ms | 12–17 / 2–8 / 8–10 |
+
+In dedicated `speed_test` runs (completed cleanly from Hong Kong; local runs
+aborted due to local SSL EOF errors), Exa `auto` median was 237 ms, `instant`
+363 ms, and `deep-lite` 2,768 ms; Tavily `ultra-fast` was 773 ms, `fast` 953 ms,
+`basic` 2,220 ms, and `advanced` 5,018 ms.
+
+Key mode observations:
+- Latencies are highly egress-sensitive: Tavily basic drops from ~3.6s locally to
+  640 ms in Hong Kong; Exa instant drops from ~1.1–1.4s locally to 466 ms in HK.
+- **Exa `deep` experienced genuine server-side latency drift**: 5.3s in August
+  ballooned to ~8.5–11.6s across all test runs and egresses, while
+  `deep-reasoning` remained in the ~11.8–14.3s range.
+- Mode hit qualities remained aligned with baseline: Tavily `advanced` continues
+  to provide no quality improvement over `basic` (14–15 vs 15 target hits)
+  despite costing 2 credits. Exa `deep-lite` remains an inferior value compared
+  to `auto`.
+
+### 5.3 Parameter boundary checks and drift observations
+
+All baseline boundary and edge findings were reproduced across both endpoints:
+- Exa category conflicts: `company` + date filters, `people` + date filters, and
+  `people` + `excludeDomains` consistently return HTTP 400.
+  `company` + `excludeDomains` returned HTTP 200 on both sides, confirming
+  it as undocumented vendor drift rather than a reliable contract.
+- Tavily accepted boundary values: 1,501-character queries, `max_results: 21`,
+  and `timeout: 61` were all accepted without rejection.
+- Exa boundaries: `numResults: 101` and `additionalQueries: 11` were accepted;
+  requesting HIPAA compliance returned HTTP 403.
+- Deprecated Exa parameters (`neural`/`keyword`, `context`, `startCrawlDate`/`endCrawlDate`,
+  `livecrawl`) returned HTTP 200 but were silently ignored (Jaccard 1.0 against
+  controls).
+- Tavily `auto_parameters` with explicit `search_depth: basic` still billed 2
+  credits and returned identical results (`same_order: true`) to basic.
+
+Three new drifts were observed:
+1. **`safe_search` now returns HTTP 200**: In August 2026 this account returned
+   HTTP 403; on 2026-10-03 both endpoints succeeded with HTTP 200.
+2. **`resolvedSearchType` reappeared in Exa responses**: Previously audited as
+   removed in 2026-04/05, the field was present in 2026-10-03 responses.
+3. **`exact_match` behavior is unstable**: On Local Round 1, the test query
+   returned 0 results (Jaccard 0.0 against control); on Local Round 2, it
+   returned 5 results. Do not treat `exact_match` as dependable across runs.
+
+### 5.4 Known-URL retrieval matrix (13 sites)
+
+Results were identical across both network endpoints:
+- **Tavily `/extract` succeeded on 11/13 sites**: Reddit and Tieba still fail
+  consistently. Zhihu returned a 35-character login wall/homepage shell instead
+  of target answers. Linux.do succeeded but continued to return the injected
+  tail block.
+- **Exa `/contents`**:
+  - Cached retrieval (`maxAgeHours: -1` or `24`) succeeded on both Bilibili and
+    Tieba.
+  - X (Twitter) and Reddit remain blocked with `SOURCE_NOT_AVAILABLE`.
+  - Forced live fetching (`maxAgeHours: 0`) became flaky rather than a
+    guaranteed 30s timeout: all difficult sites resolved in <13s, but Linux.do
+    threw `CRAWL_UNKNOWN_ERROR` on the Hong Kong host (succeeded locally), and
+    Tieba live fetch returned HTTP 500 across both endpoints.
+
+### 5.5 Caveats and operational notes
+
+1. **Local egress network instability**: The local Windows test environment
+   encountered two transient SSL EOF disconnects (on the first query of
+   `search_compare` and during `speed_test`). Hong Kong cloud execution ran
+   cleanly without connection drops.
+2. **Community test variance**: In the dedicated `community_test`, Chinese forum
+   queries via Tavily returned off-topic filler (investing.com and gaming sites)
+   across both runs, while Exa Chinese recall remained coherent. This is noted as
+   a single-snapshot caveat requiring follow-up verification before altering
+   routing weights.
+3. **Benchmark script compatibility**: The benchmark script
+   `tests/comprehensive_benchmark.py` previously failed with a `SyntaxError` on
+   Python ≤3.11 due to backslashes inside f-string expressions; this was fixed
+   in this regression cycle.
+
+**Conclusion**: The core routing conclusions remain fully valid: community
+queries route to Tavily, official documentation and dated queries route to Exa,
+and all known boundary pitfalls persist. Latency figures are highly network-sensitive,
+while Exa `deep` slowdown represents genuine vendor-side drift.

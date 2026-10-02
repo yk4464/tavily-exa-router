@@ -24,13 +24,13 @@ is the playbook for keeping it honest.
 
 1. Run the scripts (see `tests/README.md` for costs):
    `python tests/batch_compare.py` and the relevant comprehensive suites.
-2. Inspect semantic evidence, not just HTTP status: domain constraints,
+2. Inspect semantic evidence beyond HTTP status codes: domain constraints,
    per-URL failures, result fields, SSE completion, output-schema shape, cache
    state, login walls, and prompt-like instructions in fetched pages.
-3. Manually review all fixed mode-query results. The allowlisted community and
-   authority counts are heuristics and cannot grade relevance by themselves.
-4. Update `references/evidence.md`: replace drifted numbers, **bump the
-   "as of" dates**, and note what changed (don't silently rewrite history).
+3. Manually review all fixed mode-query results. Allowlisted community and
+   authority counts are heuristics and do not grade relevance alone.
+4. Update `references/evidence.md`: replace drifted numbers, **bump "as of"
+   dates**, and note changes without erasing history.
 5. If a routing rule in `SKILL.md` no longer matches the evidence, change
    the rule and say why in the CHANGELOG.
 6. Update `SKILL.md` frontmatter `metadata.version` and `CHANGELOG.md`,
@@ -53,5 +53,5 @@ demand. To enable:
 2. Add `TAVILY_API_KEY` and `EXA_API_KEY`
 3. Actions → drift-check → Run workflow (first run validates the setup)
 
-Without secrets the workflow skips gracefully (green, no-op). A red run
-means a documented fact drifted — open an issue from it, re-test, refresh.
+Without secrets, the workflow skips cleanly (green, no-op). A red run
+flags drifted facts — open an issue, re-test, and update accordingly.

@@ -125,7 +125,8 @@ def source_identity(url):
         if match:
             return f"arxiv:{match.group(1).removesuffix('.pdf').lower()}"
     if host == "doi.org" and path.lower().startswith("/10.48550/arxiv."):
-        return f"arxiv:{re.sub(r'^/10\\.48550/arxiv\\.', '', path, flags=re.I).lower()}"
+        norm = re.sub(r"^/10\.48550/arxiv\.", "", path, flags=re.I).lower()
+        return f"arxiv:{norm}"
 
     segments = [segment for segment in path.split("/") if segment]
     if (len(segments) >= 4 and segments[0] == "t"

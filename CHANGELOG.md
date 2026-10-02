@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.4.0 — 2026-10-03
+
+
+- New routing rule: for research or evaluative questions, run multiple
+  searches and include a community-source pass — official docs state
+  intended behavior while Linux.do/X/Reddit/HN threads surface actual
+  behavior. SKILL.md gained a "Verifying a product/API/vendor claim"
+  routing row (both providers) and the second-opinion section was
+  broadened into "Multiple searches and second opinion".
+- Documentation consistency patch across the repository:
+  - Corrected drift-check count in `README.md` and `README_EN.md`:
+    they stated "4 facts" while `smoke_test.py` runs 9 checks
+    on a full pass (6 before v1.3.4, plus three pricing guardrails:
+    Exa default search USD 0.007, Exa deep USD 0.012, Tavily advanced
+    2 credits).
+  - Refreshed evidence dates in README headers to reflect the 2026-08-18
+    baseline alongside both rechecks (2026-09-21 spot recheck and 2026-09-25
+    injection survey).
+  - Completed root-level file listings in repository layout trees across both
+    READMEs (`CONTRIBUTING.md`, `MAINTENANCE.md`, `CHANGELOG.md`, `LICENSE`).
+  - Updated `tests/README.md` to detail all 9 smoke test checks and the
+    pricing guardrails; documented `evals/evals.json` (13 routing/scope
+    eval cases run via evaluation harness, not part of CI).
+  - Added reader-facing sections to both READMEs: a usage example table
+    (three routed requests with parameters and fallback) and a troubleshooting
+    Q&A (skill not triggering, single-provider degradation, explicit user
+    override, test-only API keys, updating via CLI or `git pull`).
+  - Expanded `CONTRIBUTING.md` with a pre-submission checklist covering
+    `validate_repo.py`, bilingual README parity, evidence/CHANGELOG
+    discipline, four-point semver alignment, and the USD price rule.
+  - Note: Scheduled drift-check CI on 2026-10-01 ran against remote `bea4992`
+    (v1.3.1); v1.3.4–v1.4.0 had not run in automated CI at release time.
+  - Prose polish across user-facing docs (both READMEs, `CONTRIBUTING.md`,
+    `MAINTENANCE.md`, `tests/README.md`). `references/` is intentionally
+    verbatim — its wording encodes measured caveats and claim boundaries.
+- **Quarterly full regression run (2026-10-03)**:
+  - Executed across two network environments (local Windows workstation and Aliyun Hong Kong cloud host), covering 172 test cases per endpoint (344 total calls) across modes, parameters, boundaries, and URL extraction, plus dedicated passes (`smoke_test.py` passing 9/9 on both endpoints, `speed_test`, and `community_test`).
+  - Appended `references/evidence.md` §5 with dated snapshots; preserved all historical evidence sections §1–§4b unmodified.
+  - Refreshed mode latency metrics to multi-environment interval representations across `SKILL.md` and both READMEs (e.g. Tavily basic ~0.6–3.6s, Exa instant ~0.5–1.4s), highlighting network egress sensitivity.
+  - Documented server-side latency drift for Exa `deep` (~8.5–11.6s vs 5.3s in August baseline).
+  - Domain Jaccard overlap dropped from 0.22 to 0.12 across 158–159 results, confirming strong complementarity between providers.
+  - Observed three new parameter drifts: `safe_search` now returns HTTP 200 (previously HTTP 403 on this tier); `resolvedSearchType` reappeared in Exa responses; `exact_match` exhibited unstable recall between runs (0 vs 5 results).
+  - Documented URL retrieval shifts: Bilibili works across modes; Exa cached retrieval succeeds on Tieba; forced live fetch is flaky (<13s rather than guaranteed 30s timeout).
+  - Fixed Python ≤3.11 compatibility in `tests/comprehensive_benchmark.py` where backslashes inside f-strings caused a `SyntaxError`.
+- Version bump: synchronized `SKILL.md` frontmatter, both README headers, and
+  CHANGELOG heading to 1.4.0.
 ## 1.3.4 — 2026-09-25
 
 - **Prompt-injection rule generalized and strengthened.** The skill's

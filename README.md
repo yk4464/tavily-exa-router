@@ -1,16 +1,15 @@
 # tavily-exa-router
 
-[English](README_EN.md) · 当前版本 v1.3.4 · 证据测于 2026-08-18（2026-09-21 抽检复核）
+[English](README_EN.md) · 当前版本 v1.4.0 · 证据基线 2026-08-18；2026-09-21 抽检 + 2026-09-25 注入巡查复核 + 2026-10-03 全量复测
 
-一个给 AI 编码助手（Claude Code 等）用的**搜索路由 skill**：当任务需要在 Tavily 和 Exa 两个搜索 API 之间做选择时，按查询类型直接给出选哪个、配什么参数。所有规则都由 2026-08-18 的实测数据支撑，不是主观偏好。
+一个面向 AI 编码助手（如 Claude Code）的**搜索路由 skill**：在 Tavily 与 Exa 两个 API 间按查询类型决定选谁、配什么参数。所有规则均由 2026-08-18 的实测数据支撑，不凭主观偏好。
 
-从 v1.2.0 起，只要环境里 **Tavily 与 Exa 同时可用**（MCP 工具、技能、CLI 或已配置的 API key 任意形式），它就是公开网页检索的**默认入口**——搜索、查新闻、做研究、抓已知 URL 都先走它，浏览器和通用 WebFetch/WebSearch 只作后备，除非用户明确指定其他方式。触发条件只是服务可用，**不需要任何预检或测试请求**。
-
+从 v1.2.0 起，只要环境中 **Tavily 与 Exa 同时可用**（MCP 工具、skill、CLI 或已配 API key 均可），它就是公开网页检索的**默认入口**——搜索、查新闻、做研究、抓已知 URL 都先走它；浏览器与通用 WebFetch/WebSearch 仅作后备，除非用户明确指定其他方式。服务可用即触发，**无需任何预检或探测请求**。
 ## 为什么需要它
 
 Tavily 和 Exa 都是为 LLM 设计的搜索 API，但实测（20 个查询，两服务各返回约 160 条结果）发现：
 
-- 两者的域名重合度只有 **0.22**（Jaccard）——它们覆盖的是网络的不同角落，选错一边就等于丢掉另一半来源。
+- 两者的域名重合度只有 **0.22**（Jaccard，2026-10-03 复测降至 **0.12**）——它们覆盖的是网络的不同角落，选错一边就等于丢掉另一半来源。
 - **社区内容**：Tavily 命中白名单社区域名（Reddit、HN、Quora 等）17 次，Exa 只有 6 次。
 - **官方/权威来源**：Exa 命中 18 次，Tavily 只有 6 次。
 - **发布日期**：Exa 的结果约一半带 `publishedDate`；Tavily 的 158 条结果**全部没有**。
@@ -35,30 +34,31 @@ Tavily 和 Exa 都是为 LLM 设计的搜索 API，但实测（20 个查询，�
 | agent 循环里自动过滤结果 | **Tavily** | 每条结果带相关性 `score`；低于 0.3 基本是填充内容 |
 | 广覆盖一次性研究 | **Exa** | `auto` + 更大 `numResults`（上限 100） |
 
-两个都合适时：读密集型研究优先 Exa，交互速度优先 Tavily。第一家结果弱就跑另一家——22% 的重合度意味着第二次调用通常带来新来源而不是重复。
+两个都合适时：读密集型研究优先 Exa，交互速度优先 Tavily。第一家结果弱就跑另一家——0.12~0.22 的重合度意味着第二次调用通常带来新来源而不是重复。
 
 失败回退：超时 / 5xx 重试一次后换家；429 尊重 `Retry-After`，否则直接换家；401/403 不要重用同一凭证。
 
 ## 模式怎么选（实测中位数延迟）
 
+延迟随网络出口大幅波动（如香港出口通常显著快于本地网络；以下为跨环境实测区间）：
+
 **Tavily `search_depth`**
 
 | 模式 | 延迟 | 费用 | 结论 |
 |---|---|---|---|
-| `basic` | 3.6s | 1 credit | 默认，综合质量最好 |
-| `advanced` | 4.9s | 2 credits | 不要想当然当作质量升级（本轮目标命中反而低于 basic） |
-| `fast` / `ultra-fast` | ~1.4s | 1 credit | 会混入招聘/营销页，只用于找候选列表 |
+| `basic` | ~0.6–3.6s | 1 credit | 默认，综合质量最好 |
+| `advanced` | ~0.8–4.6s | 2 credits | 不要想当然当作质量升级（本轮目标命中反而低于 basic） |
+| `fast` / `ultra-fast` | ~0.6–2.1s | 1 credit | 会混入招聘/营销页，只用于找候选列表 |
 
 **Exa `type`**
 
 | 模式 | 延迟 | 费用 | 结论 |
 |---|---|---|---|
-| `instant` | 0.97s | $0.007 | 最快的有用默认，官方与学术链接特别强 |
-| `auto` | 1.78s | $0.007 | 查询形态不明确时最安全的通用默认 |
-| `deep` | 5.3s | $0.012 | 目标命中最高档，用于刻意的研究回合 |
-| `deep-reasoning` | 12.7s | $0.015 | 英文社区召回最好，但严格中文查询会漂移到英文 |
-| `deep-lite` | 6.0s | $0.012 | 相比 auto 没有稳定收益 |
-
+| `instant` | ~0.5–1.4s | $0.007 | 最快的有用默认，官方与学术链接特别强 |
+| `auto` | ~1.1–2.6s | $0.007 | 查询形态不明确时最安全的通用默认 |
+| `deep` | ~8.5–11.6s | $0.012 | 目标命中最高档，用于刻意的研究回合（2026-10-03 实测服务端延迟有明显上升） |
+| `deep-reasoning` | ~11.8–14.3s | $0.015 | 英文社区召回最好，但严格中文查询会漂移到英文 |
+| `deep-lite` | ~3.3–6.0s | $0.012 | 相比 auto 没有稳定收益 |
 ## 实测踩过的坑
 
 - Exa `category: company` / `people` 叠加日期过滤 → HTTP 400（smoke test 每月盯这条）。
@@ -109,12 +109,50 @@ git clone https://github.com/yk4464/tavily-exa-router.git ~/.claude/skills/tavil
 
 装好后，只要 Tavily 与 Exa 工具同时可见，公开网页检索（搜索、查资料、抓取已知 URL）默认都会走这个 skill，而不是浏览器或通用 WebFetch——除非你明确指定其他方式。无论它通过 HTTP API、CLI 还是 MCP 工具调 Tavily/Exa，路由规则都适用。只有跑本仓库的测试脚本才需要设置 `TAVILY_API_KEY` 和 `EXA_API_KEY` 环境变量。
 
+## 使用示例
+
+安装后无需手动触发或记忆命令。遇到公开网页检索任务时，agent 调用前会声明选择哪家 provider、依据什么特征、何时切换回退。典型路由决策如下：
+
+| 用户输入 | 路由决策 | 参数与依据 | 失败回退条件 |
+|---|---|---|---|
+| 「查一下 X 最新消息」 | **Exa** | `type: instant`（求快）或 `auto`（求广），算当前 ISO 时间加 `startPublishedDate`；优先官方与权威链接 | 返回为空或 5xx/超时，重试一次后切 Tavily `topic: "news"` + `time_range` |
+| 「看看 Reddit/HN 上怎么评价 Y」 | **Tavily** | `search_depth: "basic"`；Tavily 社区与论坛覆盖实测占优（命中 17 次 vs Exa 6 次） | 论坛召回仍弱时，换 Exa 交叉检索 |
+| 「读一下这个 URL 的内容」 | **Tavily / Exa** | 页面重 JS 或有反爬走 Tavily `/extract`；已索引公开页面走 Exa `/contents`；不直接交由通用 WebFetch | 目标返回空、JS 空壳或登录墙时，切另一家端点验证 |
+
+## 常见问题与排查
+
+### 1. Skill 没有触发怎么办？
+触发前提是当前环境中 Tavily 与 Exa **同时可用**（无论 MCP 工具、skill、CLI 还是已配 API key）。两者都在时，agent 会默认把公开检索交由此 skill 路由，不需要事先发测试请求探测。请检查宿主配置中两个工具或 key 是否均已就绪。
+
+### 2. 环境里只有一家 provider 可用会怎样？
+按 SKILL.md 的 Bypass 规则：某一家缺失或不可用时，降级使用可用的一家并按参数表配置；两家均不可用时，才退回环境自带的通用检索工具（如浏览器或内置 WebSearch/WebFetch）。
+
+### 3. 如何临时改用浏览器或通用 WebSearch？
+在提示词中明确说明即可（例如「用浏览器打开」、「使用 WebSearch，不要调搜索 API」）。用户显式指定的检索方式优先级最高，skill 自动旁路。
+
+### 4. 跑测试脚本为什么提示需要 API Key？
+日常使用走宿主环境工具，本机无需设置环境变量；只有开发者主动运行 `tests/` 下的自动化脚本（如 `smoke_test.py`、`comprehensive_benchmark.py`）时，才需要配置 `TAVILY_API_KEY` 与 `EXA_API_KEY`。
+
+### 5. 如何更新 skill？
+- **使用 skills CLI 安装**：检查并拉取更新：
+  ```bash
+  npx skills check && npx skills update
+  ```
+- **手动 git clone 安装**：进入对应 skill 安装目录执行拉取：
+  ```bash
+  git pull
+  ```
+
 ## 仓库结构
 
 ```
 SKILL.md                  # 核心交付物：路由规则全文（给 agent 读）
+CONTRIBUTING.md           # 贡献指南与改动流程
+MAINTENANCE.md            # 维护节奏与 semver 版本策略
+CHANGELOG.md              # 版本演化记录
+LICENSE                   # MIT 许可证
 references/
-  evidence.md             # 2026-08-18 实测数据（4 套测试、192 次调用；另有 09-21 抽检）
+  evidence.md             # 2026-08-18 实测数据（4 套测试、192 次调用；另有 09-21 抽检、09-25 注入巡查、10-03 全量复测）
   tavily.md               # Tavily 端点/参数/定价完整参考
   exa.md                  # Exa 端点/参数/定价完整参考
   community-feedback.md   # 约 40 个来源的 issue tracker 与从业者报告
@@ -131,7 +169,7 @@ agents/openai.yaml        # OpenAI Agents 平台接口声明
 
 ```bash
 python tests/validate_repo.py            # 仓库自检：frontmatter、泄漏、引用完整性（免费）
-python tests/smoke_test.py               # 漂移检查：4 条关键事实是否仍然成立（约 $0.03）
+python tests/smoke_test.py               # 漂移检查：9 项关键事实是否仍然成立（约 $0.03）
 python tests/comprehensive_benchmark.py --suite all   # 全量基准：模式/参数/13 站抓取矩阵
 ```
 

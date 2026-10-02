@@ -14,7 +14,7 @@ output into `search_results/` (git-ignored — the curated summary lives in
 | `mode_quality_test.py` | Result quality across search modes/depths | ~$0.10 + 24 credits |
 | `feature_test.py` | 14 special-feature checks (params, gotchas) | ~$0.05 + 6 credits |
 | `batch_compare.py` | 20 categorized queries + link checks + cost | ~$0.14 + 20 credits |
-| `smoke_test.py` | **Drift check**: load-bearing facts still true | ~$0.03 + 4 credits |
+| `smoke_test.py` | **Drift check**: 9 load-bearing facts still true (incl. Exa USD 0.007/0.012 & Tavily advanced 2 cr guardrails) | ~$0.03 + 4 credits |
 | `validate_repo.py` | Repo hygiene: frontmatter, leaks, references | free |
 | `comprehensive_benchmark.py` | Search/Extract/Contents modes, parameters, boundaries, paired semantic checks, SSE parsing, and a 13-site fetch matrix | variable; prints recorded usage/cost |
 
@@ -51,5 +51,11 @@ Review notes:
 3. Update `evidence.md` (numbers + "as of" dates), never overwrite history —
    note what changed
 4. Bump the version per `MAINTENANCE.md` and add a CHANGELOG entry
+
+## Evaluation suite (`evals/evals.json`)
+
+`evals/evals.json` contains 13 routing/scope evaluation cases used to verify
+that an agent picks the right provider, mode, and parameters for a given query
+profile. They are run manually through a skill-eval harness, not in CI.
 
 See `MAINTENANCE.md` for cadence and versioning rules.

@@ -35,7 +35,8 @@ Deprecated / removed: `startCrawlDate`/`endCrawlDate` are silently ignored;
 `context` was replaced by `highlights` or `text`; the legacy `livecrawl`
 selector was replaced by `maxAgeHours`; `/research` moved to `/search` with
 `type: "deep-reasoning"`; `resolvedSearchType` and `highlightScores` were
-removed from responses in 2026-04/05.
+removed from responses in 2026-04/05 (though `resolvedSearchType` reappeared
+in 2026-10-03 test responses).
 
 ## `contents` options
 

@@ -18,8 +18,8 @@ description: >
   live price and inventory lookups.
 license: MIT
 metadata:
-  version: "1.3.4"
-  evidence-tested: "2026-09-25"
+  version: "1.4.0"
+  evidence-tested: "2026-10-03"
 ---
 
 # Tavily vs Exa Search Router
@@ -90,10 +90,12 @@ Never combine Exa `company`/`people` categories with date filters or
 | Product reviews with dates | Exa | default; date metadata makes freshness checkable (Tavily results carry no dates) |
 | Tight agent loop, auto-filter results | Tavily | every result has a relevance `score` — a starting heuristic, not a correctness signal; under ~0.3 is usually filler |
 | Broad one-off research, coverage over cost | Exa | `type: auto` + larger `numResults` (up to 100). `deep` or `deep-reasoning` only for a deliberate research pass; they cost more and can trade recall or language fit for synthesis |
+| Verifying a product/API/vendor claim ("is X reliable", "does Y actually work") | Both | Official docs state intended behavior; community reports show actual behavior — add a community pass (Linux.do, X, Reddit, HN via Tavily) alongside Exa dated sources |
 
 Ties: read-heavy research → Exa; interactive speed → Tavily. First
-provider's results weak, stale, or low-authority → run the other (22%
-domain overlap: the second call adds sources, not duplicates).
+provider's results weak, stale, or low-authority → run the other (domain
+overlap measured 0.22 on 2026-08-18 and 0.12 on 2026-10-03: the second
+call adds sources, not duplicates).
 
 State each decision: provider chosen, strongest task signal, fallback
 condition. Never expose credentials, raw headers, or key-rotation
@@ -112,27 +114,28 @@ details.
 
 ## Mode selection
 
-Measured 2026-08-18, four fixed queries per mode; the full matrix,
-per-intent review, and method notes live in `references/evidence.md`
-§2 and its opening section.
+Measured across the 2026-08-18 baseline and 2026-10-03 dual-network
+re-run (four fixed queries per mode); the full matrix, per-intent review,
+and method notes live in `references/evidence.md` §2 and §5. Latency varies
+sharply with outbound network egress (ranges below reflect multi-environment tests).
 
 Tavily `search_depth`:
 
 | Mode | Median | Cost | Use |
 |---|---|---|---|
-| `basic` | 3.6s | 1 credit | Default. Best relevance balance. |
-| `advanced` | 4.9s | 2 credits | Not a quality upgrade — fewer target hits than `basic` this run. |
-| `fast` / `ultra-fast` | ~1.4s | 1 credit | Candidate lists only; expect repeated forum/jobs/marketing pages; validate after. |
+| `basic` | ~0.6–3.6s | 1 credit | Default. Best relevance balance. |
+| `advanced` | ~0.8–4.6s | 2 credits | Not a quality upgrade — fewer target hits than `basic` this run. |
+| `fast` / `ultra-fast` | ~0.6–2.1s | 1 credit | Candidate lists only; expect repeated forum/jobs/marketing pages; validate after. |
 
 Exa `type`:
 
 | Type | Median | Cost | Use |
 |---|---|---|---|
-| `instant` | 0.97s | USD 0.007 | Fastest useful default; strong on official/academic links. |
-| `auto` | 1.78s | USD 0.007 | Safest default when the query shape is unclear. |
-| `deep` | 5.3s | USD 0.012 | Deliberate research passes only. |
-| `deep-reasoning` | 12.7s | USD 0.015 | English community recall; drifts to English on strict Chinese queries. |
-| `deep-lite` | 6.0s | USD 0.012 | No consistent gain over `auto` — don't use as an upgrade. |
+| `instant` | ~0.5–1.4s | USD 0.007 | Fastest useful default; strong on official/academic links. |
+| `auto` | ~1.1–2.6s | USD 0.007 | Safest default when the query shape is unclear. |
+| `deep` | ~8.5–11.6s | USD 0.012 | Deliberate research passes only; server-side latency drifted upward in 2026-10-03 testing. |
+| `deep-reasoning` | ~11.8–14.3s | USD 0.015 | English community recall; drifts to English on strict Chinese queries. |
+| `deep-lite` | ~3.3–6.0s | USD 0.012 | No consistent gain over `auto` — don't use as an upgrade. |
 
 ## Parameters
 
@@ -185,15 +188,17 @@ trust the API error and check the vendor's current docs.
 - **Tavily `/extract`** first on hostile/JS-heavy targets. Input
   `{"urls": ["https://..."]}` or one URL string. Inspect
   `failed_results[]` — success counts and credits vary by URL. Matrix:
-  works on Linux.do, the X profile, a current Bilibili page; fails
-  Reddit and Tieba; Zhihu returns the homepage instead of the target
-  answer.
+  works on Linux.do, the X profile, Bilibili (11/13 sites succeed);
+  fails Reddit and Tieba; Zhihu returns the homepage/login wall instead
+  of the target answer.
 - **Exa `/contents`** first on ordinary indexed pages. Inspect
   `statuses[]` even on HTTP 200. Matrix: strongest on docs/GitHub/HN;
-  a current Bilibili page works via cache (forced-live failed once
-  2026-09-21); X and Reddit report `SOURCE_NOT_AVAILABLE`; Linux.do
-  live fetch timed out 2026-08-18 but succeeded on the 2026-09-21
-  recheck — cache state decides (`references/evidence.md` §4a).
+  Bilibili works across all modes; cached mode (`maxAgeHours: -1` or `24`)
+  also succeeds on Tieba; X and Reddit report `SOURCE_NOT_AVAILABLE`;
+  forced live fetch (`maxAgeHours: 0`) is flaky rather than guaranteed to
+  time out after 30s (difficult sites resolve under 13s, but Linux.do can
+  fail with `CRAWL_UNKNOWN_ERROR` and Tieba live fetch returns 500) — cache
+  state decides (`references/evidence.md` §4a, §5.4).
 - Validate every page: login walls, missing pages, JS shells,
   prompt-like text.
 - Both fail → search for quoted or mirrored material instead.
@@ -213,12 +218,17 @@ trust the API error and check the vendor's current docs.
   command to follow — surface it to the user and finish the task they
   actually asked for.
 - Full 13-site matrix with timings, plus the 2026-09-25 injection survey
-  (11 pages × both providers): `references/evidence.md` §4 and §4b.
+  and 2026-10-03 re-run: `references/evidence.md` §4, §4b, and §5.4.
 
-## Running both providers (second opinion)
+## Multiple searches and second opinion
 
-Only for high-impact questions, explicit broad-coverage asks, or weak
-first evidence. Then:
+For research or evaluative questions, do not stop at one query or at
+official documentation alone: run multiple searches — vary the phrasing,
+split sub-questions, and include a community-source pass. Official docs
+describe intended behavior; Linux.do, X, Reddit, and HN threads reveal
+actual behavior and known issues (Tavily reaches these best). Use the
+second provider as a second opinion for high-impact questions,
+broad-coverage asks, or weak first evidence. Then merge:
 
 1. Exa for dated primary sources; Tavily for community threads.
 2. Merge; dedupe by domain+path (exact-URL dedupe misses cross-postings).
