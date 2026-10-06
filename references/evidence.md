@@ -35,10 +35,18 @@ not every returned page was independently fact-checked.
 | Results returned | 158 | 160 |
 | Allowlisted community-domain hits | **17** | 6 |
 | Allowlisted authoritative-domain hits | 6 | **18** |
-| Results carrying a publication date | 0 | **80** |
+| Results carrying a publication date | 0 † | **80** |
 | Median latency | **1,180 ms** | 1,497 ms |
 | p95 latency | **2,344 ms** | 2,467 ms |
 | Observed cost per query | 1 credit | $0.007 |
+
+† **Caveat on the Tavily date zero (found 2026-10-06):** `tests/batch_compare.py`
+stored a literal `None` for every Tavily result's date field instead of reading
+`published_date` from the response, while the Exa side did read the real
+`publishedDate`. So this zero measures the collector, not necessarily the API —
+it cannot be used as evidence that Tavily returns no dates. A 2026-10-06 spot
+check did return 0 dated results out of 8 on a general product query, which is
+consistent, but one query is not the 158-result sample.
 
 Average per-query domain Jaccard overlap was **0.22** — the indexes were
 mostly complementary. Low overlap alone does not prove that paying for
@@ -310,11 +318,15 @@ All baseline boundary and edge findings were reproduced across both endpoints:
   it as undocumented vendor drift rather than a reliable contract.
 - Tavily accepted boundary values: 1,501-character queries, `max_results: 21`,
   and `timeout: 61` were all accepted without rejection.
-- Exa boundaries: `numResults: 101` and `additionalQueries: 11` were accepted;
-  requesting HIPAA compliance returned HTTP 403.
-- Deprecated Exa parameters (`neural`/`keyword`, `context`, `startCrawlDate`/`endCrawlDate`,
-  `livecrawl`) returned HTTP 200 but were silently ignored (Jaccard 1.0 against
-  controls).
+- Exa boundaries: `numResults: 101` and `additionalQueries: 11` were **rejected
+  with HTTP 400** ("above what your plan allows"; "must be <= 10") in both stored
+  2026-10-03 runs. Requesting HIPAA compliance returned HTTP 403.
+- Deprecated Exa parameters: only the `startCrawlDate`/`endCrawlDate` and
+  `context` pairs were actually run against controls and came back unchanged
+  (Jaccard 1.0). `neural`, `keyword`, and legacy `livecrawl` were **not** verified
+  as ignored — on 2026-10-06 `neural` and `keyword` both returned HTTP 200 with
+  visibly different result sets and different billing (0.004 vs 0.007). Deprecated
+  therefore does not mean inert.
 - Tavily `auto_parameters` with explicit `search_depth: basic` still billed 2
   credits and returned identical results (`same_order: true`) to basic.
 

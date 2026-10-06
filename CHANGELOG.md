@@ -1,5 +1,106 @@
 # Changelog
 
+## Unreleased
+
+Corrections from a multi-model audit with live API verification on
+2026-10-06 (11 parallel review tracks: DeepSeek, GLM, Gemini, Tavily
+official docs, Exa official docs, evidence-decay audit, and three
+review passes). Every item below was re-tested against the live APIs.
+Superseded numbers were overwritten rather than accumulated — the
+previous values are recoverable from git history.
+
+Behaviour fixes (these changed what the skill told the agent to do):
+
+- **Dedupe no longer destroys evidence.** `dedupe by domain+path` collapsed
+  8 distinct Hacker News discussions into 1, because HN threads differ only
+  by `?id=`. Now keyed on the full URL including content-identifying query
+  parameters; only known tracking params (`utm_*`, `ref`, `fbclid`) are
+  stripped.
+- **Tavily `score` is triage, not a filter.** `drop results under ~0.3` is
+  gone. A search for one specific discussion returned that discussion at
+  ~0.06, so the rule deleted the exact material the user asked for. Low
+  scores are now kept for exact URLs, user-named domains, and rare topics.
+- **`include_answer: "advanced"` is not a paid upgrade.** It was described
+  as costing "extra latency and credit"; measured 1 credit, same as
+  `basic`, and it is not reliably longer. (Measured 2026-10-06.)
+- **Untrusted-content scope widened.** The rule covered "fetched pages",
+  but a plain Tavily *search* returned the injection inside
+  `results[].content` snippets at `score` ≈ 0.81 with no fetch call at all.
+  The rule is now a standalone section covering page bodies, search
+  snippets, titles, and server-side syntheses (`answer`, `summary`,
+  `outputSchema`, `highlights`). Neither vendor documents injection
+  filtering for these fields. Reporting is now neutral by default instead
+  of `surface it to the user`, which risked reciting the payload.
+- **`outputSchema` returns well-formed, not trustworthy.** "clean JSON"
+  implied grounded content; well-formed ≠ verified, so the row now says to
+  check fields against the cited pages.
+- **`Never 9` yields to an explicit user request.** It previously read as
+  an absolute ban on browsers, contradicting the bypass rule and eval 13.
+- **Community passes are conditional.** Interface/definition questions
+  that the primary source already answers no longer force extra searches.
+- **`startPublishedDate` is a window start, not "now".** A lower bound of
+  the current instant excluded same-day official announcements.
+- **Finance scope clarified.** A current quote is out of scope; news,
+  filings and sector commentary route to `topic: "finance"`.
+- **`400` is permanent.** Added to the retry rules — never retry it.
+
+Price and parameter corrections (measured 2026-10-06):
+
+- Exa `instant` is **USD 0.004/1k**, not 0.007 (three live requests). The
+  documented price was 1.75× the real one.
+- Exa `fast` was missing from the mode table entirely; added at USD 0.007.
+- Exa bills **each result beyond 10** at USD 0.001: `numResults` 50 cost
+  0.047 (6.7×) and 100 returned 99 for 0.096 (13.7×). The "widen
+  `numResults` to 100" recommendation now quotes the real figure.
+- Tavily `safe_search` is **available on all plans** since 2026-08 (was
+  documented as enterprise-only), but is **rejected with `fast` /
+  `ultra-fast`** — a combination that was missing from the rules.
+- Tavily `max_results` default is unreliable: vendor pages disagree (5 vs
+  10) and this account returned 10 when unset, so it must be explicit.
+- `resolvedSearchType` is not a stable contract — the current spec marks
+  it deprecated and possibly empty; observed as `""` in every response.
+- `company` + `excludeDomains` returned **200** on 2026-08-18, 2026-10-03
+  and 2026-10-06. The text said 400. Kept as unsupported because the
+  official spec says so; the 200 is drift, not a contract.
+- The 2026-03 price-rise date could not be confirmed against a vendor
+  changelog entry (third parties split March vs April); now marked
+  uncertain rather than stated flatly.
+
+Evidence corrections:
+
+- `references/evidence.md` claimed `numResults: 101` and
+  `additionalQueries: 11` "were accepted"; the stored raw results record
+  **400** for both. Corrected.
+- `evidence.md` claimed `neural` / `keyword` / `livecrawl` were "silently
+  ignored". Only the crawl-date and `context` pairs had controls;
+  `neural` and `keyword` return 200 with different results and different
+  billing. Deprecated ≠ inert.
+- **The "Tavily 0 of 158 results carry `published_date`" statistic was an
+  artifact of the collector**: `batch_compare.py` stored a literal `None`
+  for Tavily's date field while reading Exa's real `publishedDate`. The
+  script now reads the field; the figure is restated as soft evidence
+  that cannot prove the API returns none.
+- Bilibili is documented as succeeding in all three `maxAgeHours` modes
+  on 2026-10-03 (forced-live included) instead of "across all modes".
+- Latency and hit-count figures replaced with the 2026-10-03 re-run
+  (`advanced` 14–15 vs `basic` 15, upper bound 4.9s).
+
+Script fixes:
+
+- `comprehensive_benchmark.py` crashed the **entire** benchmark on a legal
+  HTTP-date `Retry-After`: `float()` raised `ValueError`, which is not an
+  `HTTPError` subclass and so escaped the handler. Now parses
+  delta-seconds and falls back to backoff for dates, NaN and negatives —
+  the last two would make `time.sleep()` raise.
+- `batch_compare.py` divided by zero when every query failed, losing the
+  whole console summary exactly when diagnostics mattered; all aggregates
+  now report `N/A` on empty input.
+- `batch_compare.py` blindly retried permanent failures: 400/401/403 were
+  each retried 3 times, waiting 12s to reach the same error the skill's
+  own rules say to fix rather than retry.
+- `validate_repo.py` missed API keys in JSON/YAML form and falsely flagged
+  documentation placeholders like `EXA_API_KEY=your_exa_api_key_here`.
+
 ## 1.4.0 — 2026-10-03
 
 

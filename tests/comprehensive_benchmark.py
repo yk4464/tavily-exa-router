@@ -207,7 +207,18 @@ def request(provider, endpoint, payload, timeout=300, stream=False):
             attempts.append(exc.code)
             if exc.code in {429, 500, 502, 503, 504} and attempt < 2:
                 retry_after = exc.headers.get("Retry-After")
-                delay = min(float(retry_after), 10.0) if retry_after else 2.0 * (attempt + 1)
+                # Retry-After is either delta-seconds or an HTTP-date (RFC 7231).
+                # float() raises ValueError on the latter, and ValueError is not
+                # an HTTPError subclass, so an unguarded parse here would tear
+                # down the whole benchmark on a legal server response.
+                delay = 2.0 * (attempt + 1)
+                if retry_after:
+                    try:
+                        parsed = float(retry_after)
+                    except ValueError:
+                        parsed = -1.0
+                    if parsed >= 0 and parsed == parsed:  # reject NaN and negatives
+                        delay = min(parsed, 10.0)
                 time.sleep(delay)
                 continue
             try:

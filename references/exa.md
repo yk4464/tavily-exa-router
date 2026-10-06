@@ -34,9 +34,12 @@ Base: `https://api.exa.ai`
 Deprecated / removed: `startCrawlDate`/`endCrawlDate` are silently ignored;
 `context` was replaced by `highlights` or `text`; the legacy `livecrawl`
 selector was replaced by `maxAgeHours`; `/research` moved to `/search` with
-`type: "deep-reasoning"`; `resolvedSearchType` and `highlightScores` were
-removed from responses in 2026-04/05 (though `resolvedSearchType` reappeared
-in 2026-10-03 test responses).
+`type: "deep-reasoning"`. `resolvedSearchType` is **not a stable contract**: the
+2026-04/05 audit recorded it as removed, the current spec marks it deprecated
+with "may be an empty string — do not branch on this value", and it was present
+as `""` in every 2026-10-06 response. Treat it as absent and never branch on it.
+`highlightScores` remains in the current response schema but was absent from all
+observed results.
 
 ## `contents` options
 
@@ -118,13 +121,24 @@ tasks.
 {"query": "<topic> survey", "includeDomains": ["arxiv.org"], "numResults": 10}
 ```
 
-## Pricing (2026-08)
+## Pricing (checked 2026-10-06)
 
-- Search: $7 / 1k requests (≤10 results each); extra results $1/1k.
-- Search: text and highlights are included for the first 10 results; summaries
-  and results beyond 10 add charges.
+Prices are per 1k requests and include **up to 10 results**. Billing follows what
+the API actually returns, so `costDollars` is the authority when it matters.
+
+- `instant`: **$4/1k**; `fast` and `auto`: $7/1k (measured 2026-10-06: `instant`
+  returned `costDollars.total` 0.004 on three requests — earlier notes here said
+  $7, which is stale).
+- Each result **beyond 10 adds $1/1k**, charged linearly on the returned count:
+  20 results → +0.010, 50 → 0.047, 100 requested returned 99 → 0.096.
+- Search text and highlights are included for the first 10 results; beyond 10
+  they are charged at $1/1k pages. `summary` is a separate $1/1k page charge.
 - Standalone Contents: $1 / 1k pages **per requested type** (text + highlights
-  on one page = 2).
-- Summaries: $1/1k pages.
-- Deep search: `deep-lite` and `deep` $12/1k; `deep-reasoning` $15/1k.
-- Free tier: $20 signup credit + $10/month.
+  on one page = 2). Verified 2026-10-06: one URL with text+highlights billed
+  0.002, with `summary` 0.003.
+- `outputSchema`: adds ~2s latency and **no separate charge** (measured
+  2026-10-06, `costDollars` unchanged).
+- Deep search: `deep-lite` and `deep` $12/1k; `deep-reasoning` $15/1k. All three
+  re-verified 2026-10-06.
+- Free tier: $20 signup credit + $10/month (vendor page has changed this
+  figure more than once — check before quoting it).

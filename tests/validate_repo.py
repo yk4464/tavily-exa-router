@@ -42,12 +42,23 @@ if unsafe:
 
 # Leak check across public text files. Patterns require a concrete username or
 # credential value, so documentation placeholders and this file do not match.
+# Explicit doc placeholders. Without these the Exa pattern fires on strings like
+# "EXA_API_KEY=your_exa_api_key_here", which makes CI red on documentation.
+PLACEHOLDERS = {
+    "...", "<", "your_", "your-", "changeme", "none", "null", "example",
+    "placeholder", "redacted", "dummy", "xxx", "todo", "replace", "insert",
+}
 patterns = {
     "Windows user path": re.compile(r"C:\\+Users\\+[^\\\s]+", re.I),
     "macOS user path": re.compile(r"/Users/[^/\s]+"),
     "Linux user path": re.compile(r"/home/[^/\s]+"),
-    "Tavily API key": re.compile(r"TAVILY_API_KEY\s*=\s*[\"']?tvly-[A-Za-z0-9_-]{16,}"),
-    "Exa API key": re.compile(r"EXA_API_KEY\s*=\s*[\"']?(?!\.\.\.|<)[A-Za-z0-9_-]{20,}"),
+    # Match shell, PowerShell and JSON/YAML shapes. The bare assignment form
+    # already covers "export K=v" and "$env:K=v" since the pattern is not
+    # anchored; the quoted branch is what catches {"K": "v"} (found 2026-10-06).
+    "Tavily API key": re.compile(
+        r"[\"']?TAVILY_API_KEY[\"']?\s*[:=]\s*[\"']?(tvly-[A-Za-z0-9_-]{16,})"),
+    "Exa API key": re.compile(
+        r"[\"']?EXA_API_KEY[\"']?\s*[:=]\s*[\"']?([A-Za-z0-9_-]{20,})"),
 }
 skip_dirs = {".git", "__pycache__", "node_modules", "search_results"}
 text_suffixes = {".md", ".py", ".yml", ".yaml", ".txt", ".json", ".toml"}
@@ -58,9 +69,15 @@ for f in sorted(root.rglob("*")):
             and not any(part in skip_dirs for part in f.relative_to(root).parts)):
         t = f.read_text(encoding="utf-8", errors="ignore")
         for label, pattern in patterns.items():
-            if pattern.search(t):
-                print(f"LEAK in {f.relative_to(root)}: {label}")
-                clean = False
+            m = pattern.search(t)
+            if not m:
+                continue
+            # Ignore matches whose value is an obvious documentation stand-in.
+            val = (m.group(1) if m.groups() else m.group(0)).strip().strip("\"'").lower()
+            if any(p in val for p in PLACEHOLDERS):
+                continue
+            print(f"LEAK in {f.relative_to(root)}: {label}")
+            clean = False
 print("leak check:", "CLEAN" if clean else "ISSUES FOUND")
 if not clean:
     errors.append("possible personal path or API key found")

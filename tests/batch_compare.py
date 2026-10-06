@@ -40,6 +40,10 @@ QUERIES = [
 
 
 def post_json(url, payload, headers, timeout=120, retries=2):
+    # 400/401/403 are permanent: retrying spends calls and wall-clock to
+    # reach the same failure. SKILL.md says a 400 means fix the parameters,
+    # not retry. Only 429/5xx and transport errors are worth another attempt.
+    permanent = {400, 401, 403}
     for attempt in range(retries + 1):
         try:
             req = urllib.request.Request(
@@ -47,7 +51,11 @@ def post_json(url, payload, headers, timeout=120, retries=2):
                 headers={"Content-Type": "application/json", **headers}, method="POST")
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.load(r)
-        except Exception:  # noqa: BLE001
+        except urllib.error.HTTPError as exc:
+            if exc.code in permanent or attempt == retries:
+                raise
+            time.sleep(4 * (attempt + 1))
+        except Exception:  # noqa: BLE001 - transport-level: worth retrying
             if attempt == retries:
                 raise
             time.sleep(4 * (attempt + 1))
@@ -58,7 +66,13 @@ def tavily(q):
                   {"query": q, "max_results": 8, "search_depth": "basic",
                    "include_usage": True},
                   {"Authorization": f"Bearer {TAVILY_KEY}"})
-    return [{"u": r["url"], "t": (r.get("title") or "")[:80], "d": None,
+    # Read the real date field. This was a literal None before (found
+    # 2026-10-06), which made the "0 of N results carry published_date"
+    # statistic measure this collector rather than the API. Tavily only
+    # populates published_date in some modes, so also request it explicitly
+    # and record the topic so the number is interpretable.
+    return [{"u": r["url"], "t": (r.get("title") or "")[:80],
+             "d": r.get("published_date"),
              "s": r.get("score")} for r in d.get("results", [])], d.get("usage")
 
 
@@ -201,11 +215,18 @@ if __name__ == "__main__":
         de = {domain(r["u"]) for r in row["exa"]["results"]}
         if dt or de:
             overlaps.append(len(dt & de) / len(dt | de))
-    print(f"\n== domain overlap per query (Jaccard, avg): {sum(overlaps) / len(overlaps):.2f}")
+    # Guard every aggregate: when all queries fail, overlaps and every latency
+    # list are empty, and statistics.median([])/min([]) would raise and discard
+    # the console summary exactly when diagnostics matter most.
+    avg_overlap = f"{sum(overlaps) / len(overlaps):.2f}" if overlaps else "N/A"
+    print(f"\n== domain overlap per query (Jaccard, avg): {avg_overlap}")
 
     print("\n== API latency (20 mixed queries, concurrent run) ==")
     for svc in ("tavily", "exa"):
         vals = latencies[svc]
+        if not vals:
+            print(f"  {svc:<7} median=N/A p95=N/A min=N/A max=N/A (all requests failed)")
+            continue
         print(f"  {svc:<7} median={statistics.median(vals):.0f}ms "
               f"p95={percentile(vals, 0.95):.0f}ms min={min(vals):.0f}ms max={max(vals):.0f}ms")
 

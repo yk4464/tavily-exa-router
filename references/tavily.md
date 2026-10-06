@@ -28,7 +28,7 @@ Base: `https://api.tavily.com`
 |---|---|---|
 | `query` | required | keep under 1,500 characters for portability — a 1,501-character request was accepted on 2026-08-18, but that is drift, not a contract (`references/evidence.md` §3) |
 | `search_depth` | `basic` (default) / `advanced` / `fast` / `ultra-fast` | advanced = 2 credits and showed no stable quality gain; fast/ultra-fast were faster but degraded relevance in the current four-query run |
-| `max_results` | 1–20, default 5 | documented cap 20; a 21 request was accepted once and returned 20 — treat anything beyond 20 as drift (`references/evidence.md` §3) |
+| `max_results` | 1–20, documented default 5 | vendor pages disagree (some say 5, some 10) and this account actually returned **10** when the parameter was omitted, measured twice on 2026-10-06 — treat the default as unreliable drift and **set it explicitly** when the count matters. A 21 was accepted once and returned 20; `0` is rejected with 400 (`references/evidence.md` §3) |
 | `topic` | `general` / `news` / `finance` | vertical channels; `country` only works with `general` |
 | `time_range` | `day` / `week` / `month` / `year` | convenience filter back from today |
 | `start_date` / `end_date` | `YYYY-MM-DD` | precise window |
@@ -41,7 +41,7 @@ Base: `https://api.tavily.com`
 | `exact_match` | bool | changed the result set (Jaccard 0.111 vs control) and returned 5 results; strict phrase semantics were not established |
 | `country` | ~190 names | boosts a country's results, `general` topic only; effect measured as weak |
 | `include_usage` | bool | returns credit accounting |
-| `safe_search` | bool | enterprise plans only |
+| `safe_search` | bool | **available on all plans since 2026-08** (vendor changelog "Safe search for everyone") — the earlier "enterprise only" note was stale. **Not supported with `fast` / `ultra-fast`**: that combination returns HTTP 400, confirmed 2026-10-06 |
 
 ## Response fields that matter
 
