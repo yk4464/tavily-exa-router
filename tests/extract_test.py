@@ -6,8 +6,16 @@ import os
 import re
 import urllib.request
 
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
 
 TARGETS = {
     "linux.do": "https://linux.do/t/topic/1774105",

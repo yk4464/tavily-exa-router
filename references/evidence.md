@@ -9,7 +9,9 @@ directional measurements, not an SLA. Domain counts use a static
 allowlist, which can count a provider forum as authoritative, miss a
 strong independent blog, and count several URLs for one paper as
 separate sources. Manual review used titles, URLs, and Tavily snippets;
-not every returned page was independently fact-checked.
+not every returned page was independently fact-checked. Each section is a
+dated snapshot; later findings are appended as dated notes instead of
+rewriting the earlier record.
 
 | Suite | Artifact | Scope |
 |---|---|---|
@@ -27,6 +29,8 @@ not every returned page was independently fact-checked.
 - §4a Spot check, 2026-09-21 — 5 drift-prone sites re-run
 - §4b Injection survey, 2026-09-25 — 11 pages × both providers, tail-append vs whole-body
 - §5 Full re-run, 2026-10-03 — dual-network regression, drift findings, updated latencies
+- §6 Targeted audit, 2026-10-06 — single-run checks behind the 2026-10-06 rule changes
+- §7 Exa `lite` vs legacy types, 2026-10-31 — blind quality, dates, contents, windows, per-class defaults
 
 ## 1. Broad 20-query comparison
 
@@ -48,6 +52,15 @@ it cannot be used as evidence that Tavily returns no dates. A 2026-10-06 spot
 check did return 0 dated results out of 8 on a general product query, which is
 consistent, but one query is not the 158-result sample.
 
+**Documentation check, 2026-10-31:** Tavily's current `/search` reference
+documents `include_published_date` (default `false`, currently beta, enabled
+automatically for `topic: news`) and `filter_by_published_date` (removes
+results outside the requested window, including results with no detectable
+date; setting it true also enables `include_published_date`). Neither this
+broad run nor the 2026-10-06 spot check set `include_published_date`, so a
+zero dated-result count does not show that the API cannot return dates.
+Source: https://docs.tavily.com/documentation/api-reference/endpoint/search
+
 Average per-query domain Jaccard overlap was **0.22** — the indexes were
 mostly complementary. Low overlap alone does not prove that paying for
 both improves an answer.
@@ -57,18 +70,30 @@ both improves an answer.
 Each mode used the same four intents: official documentation, original paper,
 English developer criticism, and Chinese production experience.
 
-| Provider mode | Median | Observed cost | Target hits | Community hits | Authority hits | Near-duplicates |
+| Provider mode | Median | Observed cost | Target hits | Community hits | Authority hits | Near-duplicates †† |
 |---|---:|---:|---:|---:|---:|---:|
 | Tavily `ultra-fast` | 1,408 ms | 1 credit | 9 | 4 | 7 | 3 |
 | Tavily `fast` | 1,409 ms | 1 credit | 9 | 4 | 7 | 3 |
 | Tavily `basic` | 3,603 ms | 1 credit | 13 | 7 | 8 | 1 |
 | Tavily `advanced` | 4,900 ms | 2 credits | 11 | 5 | 6 | 1 |
-| Exa `instant` | 969 ms | $0.007 | 14 | 1 | 13 | 0 |
+| Exa `instant` | 969 ms | $0.007 ‡ | 14 | 1 | 13 | 0 |
 | Exa `fast` | 1,153 ms | $0.007 | 11 | 0 | 11 | 0 |
 | Exa `auto` | 1,779 ms | $0.007 | 12 | 0 | 13 | 2 |
 | Exa `deep-lite` | 5,988 ms | $0.012 | 11 | 2 | 10 | 1 |
 | Exa `deep` | 5,262 ms | $0.012 | 15 | 6 | 11 | 0 |
 | Exa `deep-reasoning` | 12,677 ms | $0.015 | 16 | 6 | 10 | 0 |
+
+‡ This is the per-request `costDollars` observed on 2026-08-18. Three live
+`instant` requests on 2026-10-06 billed USD 0.004 each (USD 4/1k), not
+USD 0.007; see §6.
+
+†† Near-duplicates are the `near_duplicate_urls` count from
+`tests/comprehensive_benchmark.py` as it stood for this run. That formula also
+treated exact duplicates as near-duplicates, so the column is not a count of
+distinct-but-similar pages and is not comparable with a stricter duplicate
+definition. Historical values are kept as measured. From 2026-10-31 the script
+uses a same-source-only definition that excludes exact duplicates, so later
+counts are not directly comparable with these stored values.
 
 Manual review changed how these numbers should be read:
 
@@ -129,6 +154,14 @@ prove that every field was honored.
 - All six categories were accepted. `company+date`, `people+date`, and
   `people+excludeDomains` returned 400. `company+excludeDomains` happened to
   return 200, but should not be treated as a stable supported combination.
+  Official-reference check, 2026-10-31: the current spec forbids
+  `startPublishedDate`/`endPublishedDate` for both `company` and `people`,
+  and `excludeDomains` only for `people`; it does not prohibit
+  `company+excludeDomains`. The pair is therefore allowed by the contract,
+  and the 200 is consistent with it; it remains a single-account
+  observation rather than a promise
+  (https://exa.ai/docs/reference/search). This supersedes the "not a stable
+  supported combination" reading above.
 - Non-deep `additionalQueries` returned 200 but produced the same source set as
   its control. Deep modes accepted 1 and 10 extra queries; 11 returned 400.
 - `outputSchema`, moderation, location, and SSE streaming were accepted. The
@@ -172,8 +205,9 @@ the site's guidelines. It was flagged as prompt-injection and never followed.
 
 Five drift-prone sites re-run with the same request shapes as §4 (Tavily
 `/extract` basic, one batch; Exa `/contents` at `maxAgeHours` −1/0/24).
-Raw output: `search_results/spot_check_2026-09-21.json`. Single-run
-observations, same method limits as the opening section.
+Raw output: `search_results/spot_check_2026-09-21.json` — **artifact not
+retained**: `search_results/` is gitignored and this file is absent from the
+checkout. Single-run observations, same method limits as the opening section.
 
 - **Tavily: unchanged.** Linux.do (12,417 chars), X, and Bilibili usable;
   Reddit still failed; the Linux.do page still carried the AI-directed
@@ -195,7 +229,9 @@ Follow-up to §4's single Linux.do case, to test whether the phenomenon is
 site-specific and how large a share of a response it can occupy. 11 public
 pages × both providers = 22 fetches (Tavily `/extract` default; Exa
 `/contents` with `text`), read-only, no login. 19 returned body text, 3
-failed. Raw responses: `search_results/` on the run machine.
+failed. Raw responses were written under `search_results/` on the run
+machine; **artifact not retained** — that directory is gitignored and the
+responses are absent from this checkout.
 
 | Site family | Body returned | Injection signal |
 |---|---|---|
@@ -266,7 +302,7 @@ overlap:
 | Results returned | 159 | 158 |
 | Allowlisted community-domain hits | **16** | 6–7 |
 | Allowlisted authoritative-domain hits | 7 | **20–23** |
-| Results carrying a publication date | 0 | **77–84** |
+| Results carrying a publication date | 0 † | **77–84** |
 | Median latency (Local Windows) | 3,146 ms | 2,866 ms |
 | Median latency (Aliyun Hong Kong) | **644 ms** | **2,040 ms** |
 | Observed cost per query | 1 credit | $0.007 |
@@ -274,6 +310,11 @@ overlap:
 Average per-query domain Jaccard overlap dropped to **0.12** (identical across
 both network endpoints; down from 0.22 in the 2026-08-18 baseline). The two
 indexes remain sharply differentiated and complementary.
+
+† The Tavily zero has the same collector caveat as §1: `batch_compare.py`
+stored a literal `None` for Tavily dates, and this run did not enable Tavily's
+`include_published_date`. It is not evidence that Tavily omits dates; see the
+2026-10-31 documentation check in §1.
 
 ### 5.2 Search-mode latency and quality matrix
 
@@ -318,17 +359,39 @@ All baseline boundary and edge findings were reproduced across both endpoints:
   it as undocumented vendor drift rather than a reliable contract.
 - Tavily accepted boundary values: 1,501-character queries, `max_results: 21`,
   and `timeout: 61` were all accepted without rejection.
-- Exa boundaries: `numResults: 101` and `additionalQueries: 11` were **rejected
-  with HTTP 400** ("above what your plan allows"; "must be <= 10") in both stored
-  2026-10-03 runs. Requesting HIPAA compliance returned HTTP 403.
-- Deprecated Exa parameters: only the `startCrawlDate`/`endCrawlDate` and
-  `context` pairs were actually run against controls and came back unchanged
-  (Jaccard 1.0). `neural`, `keyword`, and legacy `livecrawl` were **not** verified
-  as ignored — on 2026-10-06 `neural` and `keyword` both returned HTTP 200 with
-  visibly different result sets and different billing (0.004 vs 0.007). Deprecated
-  therefore does not mean inert.
+- Exa boundaries: `numResults: 101` and `additionalQueries: 11` were accepted;
+  requesting HIPAA compliance returned HTTP 403.
+- Deprecated Exa parameters (`neural`/`keyword`, `context`, `startCrawlDate`/`endCrawlDate`,
+  `livecrawl`) returned HTTP 200 but were silently ignored (Jaccard 1.0 against
+  controls).
 - Tavily `auto_parameters` with explicit `search_depth: basic` still billed 2
   credits and returned identical results (`same_order: true`) to basic.
+
+**Correction, 2026-10-06.** Two entries above are superseded; every other
+2026-10-03 finding is kept as recorded. The full 2026-10-06 checklist is in
+§6.
+
+- **`numResults: 101` / `additionalQueries: 11` were rejected, not accepted.**
+  The stored 2026-10-03 artifacts (`search_results/comprehensive_benchmark.json`
+  and `search_results/comprehensive_run1_local.json`) record HTTP 400 for both:
+  `NUM_RESULTS_EXCEEDED` ("You are asking for a number of results above what
+  your plan allows") and a validation error, "Too big: expected array to have
+  <=10 items at \"additionalQueries\"". Both stored endpoint runs show 400.
+- **The deprecated-parameter claim was wider than the controls.** Only the
+  `startCrawlDate`/`endCrawlDate` and `context` pairs were actually compared
+  with controls (Jaccard 1.0). `neural`, `keyword`, and legacy `livecrawl` were
+  not verified as ignored. On 2026-10-06 `neural` and `keyword` returned HTTP
+  200 with visibly different result sets and different billing (0.004 vs
+  0.007); deprecated does not mean inert (§6).
+
+**Official-reference check, 2026-10-31.** The current Exa `/search` reference
+forbids `startPublishedDate`/`endPublishedDate` for both `company` and
+`people`, and `excludeDomains` only for `people`; it allows
+`company` + `excludeDomains` because only the listed restrictions are
+rejected. The three HTTP 200 observations (2026-08-18, 2026-10-03,
+2026-10-06) are consistent with that contract; this supersedes the
+"undocumented vendor drift" label in the first bullet. Source:
+https://exa.ai/docs/reference/search
 
 Three new drifts were observed:
 1. **`safe_search` now returns HTTP 200**: In August 2026 this account returned
@@ -371,7 +434,255 @@ Results were identical across both network endpoints:
    Python ≤3.11 due to backslashes inside f-string expressions; this was fixed
    in this regression cycle.
 
+## 6. Targeted audit, 2026-10-06
+
+Focused checks behind the 2026-10-06 rule, price, and parameter changes. Raw
+artifacts not retained; these are single-run observations as recorded in
+commit `b386ed7` (the 2026-10-06 audit) and repeated in `SKILL.md`,
+`CHANGELOG.md`, `references/exa.md`, and `references/tavily.md`. One account,
+one network region, no repeated trials — point observations, not a regression
+suite.
+
+### Exa
+
+- **`instant` billing:** three live requests returned `costDollars.total`
+  0.004 each (USD 4/1k), not the USD 0.007 recorded for 2026-08-18 in §2.
+  The current price table lists `auto` and `fast` at USD 0.007, `deep-lite`
+  and `deep` at USD 0.012, and `deep-reasoning` at USD 0.015; the deep prices
+  were re-verified in the same pass.
+- **Results beyond 10:** `numResults: 50` returned 50 results for USD 0.047
+  (6.7× the USD 0.007 base); `numResults: 100` returned 99 results for
+  USD 0.096 (13.7×). Billing tracks the returned count, not the requested
+  count.
+- **Standalone `/contents`:** one URL with `text` + `highlights` billed 0.002;
+  adding `summary` billed 0.003. There is no flat per-URL price.
+- **`outputSchema`:** added about 2 seconds of latency and left
+  `costDollars` unchanged — no separate charge.
+- **`startPublishedDate`:** a lower bound set to the current instant returned
+  only same-day third-party posts; a one-week bound surfaced the previous
+  day's official announcement. Use the start of the user's window.
+- **`company` + `excludeDomains`:** returned HTTP 200, the third such
+  observation after 2026-08-18 and 2026-10-03. The current contract allows
+  this pair (dates are forbidden for `company` and `people`, and
+  `excludeDomains` only for `people`), so the 200 is consistent with it —
+  see §3 and §5.3.
+- **Legacy `neural` / `keyword`:** both returned HTTP 200 with visibly
+  different result sets and different billing (0.004 vs 0.007). Deprecated
+  does not mean inert.
+- **`resolvedSearchType`:** present as `""` in every response. The field is
+  deprecated and may be empty; do not branch on it.
+
+### Tavily
+
+- **`include_answer: "advanced"`:** at `search_depth: basic` it billed 1
+  credit, the same as `basic`, and was not reliably longer. It changes detail
+  granularity, not the credit price.
+- **`max_results` default:** with the parameter omitted, the account returned
+  10 results, measured twice. Vendor pages disagree on the default (5 vs 10);
+  set it explicitly.
+- **`safe_search` depth limit:** `safe_search: true` with `search_depth:
+  fast` or `ultra-fast` returned HTTP 400.
+- **Search snippets carry page content:** a Tavily search for a page with a
+  known injection returned that injection inside `results[].content` at
+  `score` ≈ 0.81, with no `/extract` call. Injection handling applies to
+  search responses, not just fetched bodies.
+- **A low score can be the right result:** a query for one specific
+  discussion returned that discussion at `score` ≈ 0.06. Score is triage,
+  not a correctness threshold.
+
+### Merge behavior
+
+- **Dedupe on the full URL:** Hacker News threads share domain and path and
+  differ only by `?id=`. Keying on domain+path collapsed 8 distinct
+  discussions into 1; the full URL keeps them apart.
+
 **Conclusion**: The core routing conclusions remain fully valid: community
 queries route to Tavily, official documentation and dated queries route to Exa,
 and all known boundary pitfalls persist. Latency figures are highly network-sensitive,
 while Exa `deep` slowdown represents genuine vendor-side drift.
+
+## 7. Exa `lite` vs legacy types, 2026-10-31
+
+Single-egress measurement from one local Windows workstation (no Hong Kong
+host was reachable in this cycle). Eighteen queries — six current-events, six
+academic, six Chinese — each went through Exa `lite`, legacy `instant`,
+legacy `fast`, and `auto` with `numResults: 8`, three latency samples per
+query/type. The run also covered 90 contents calls (`lite`/`instant`/`auto`
+with `highlights` or `text`), 15 `startPublishedDate` probes, the two
+documented `lite` 400s, and 9 Tavily searches. A first contents/Tavily pass
+was re-run after fixing the collector's Tavily date field (`published_date`
+versus Exa's `publishedDate`); the retained artifact and the numbers here are
+from the fixed pass. A second full pass returned identical URL sets for all
+72 query/type pairs (mean Jaccard 1.0; counts and dated shares matched), so
+the quality and date tables apply to both. API spend was about USD 3.63 on
+Exa plus 37 Tavily credits (including two collector-fix passes and a raw
+field spot check); the blind judge cost USD 0.0041. Raw responses
+are in `search_results/lite_quality.json` (git-ignored, not committed); the
+query list is `tests/lite_quality_test.py`.
+
+Quality was judged blind: one state per unique (query, URL) pair (158 pairs),
+with the producing search type removed. A judge model (`typesafe/jev-1.14.0`)
+scored each result 0–3 for relevance and 0–3 for authority; per-query means
+over the top five were averaged across the six queries in each class. Scores
+are model judgments over titles, URLs, and dates — not page-content checks.
+
+### 7.1 Blind quality
+
+| Class | Type | Relevance | Authority | Relevant in top 5 |
+|---|---|---:|---:|---:|
+| news | `lite` | 2.55 | 1.64 | 4.50 |
+| news | `instant` | 2.65 | 1.75 | 4.67 |
+| news | `fast` | 2.55 | 1.64 | 4.50 |
+| news | `auto` | 2.52 | 1.58 | 4.33 |
+| academic | `lite` | 2.72 | 2.71 | 4.83 |
+| academic | `instant` | 2.74 | 2.74 | 5.00 |
+| academic | `fast` | 2.72 | 2.71 | 4.83 |
+| academic | `auto` | 2.72 | 2.71 | 4.83 |
+| Chinese | `lite` | 2.51 | 2.03 | 4.33 |
+| Chinese | `instant` | 2.58 | 1.93 | 4.50 |
+| Chinese | `fast` | 2.51 | 2.03 | 4.33 |
+| Chinese | `auto` | 2.51 | 2.03 | 4.33 |
+
+Paired differences, `instant` − `lite`, per-class mean over six queries with a
+20,000-resample bootstrap 95% interval:
+
+| Class | Relevance | Authority | Relevant top-5 |
+|---|---|---|---|
+| news | +0.10 [−0.07, +0.23] | +0.11 [−0.07, +0.29] | +0.17 [−0.33, +0.67] |
+| academic | +0.02 [−0.09, +0.11] | +0.03 [−0.02, +0.12] | +0.17 [0.00, +0.50] |
+| Chinese | +0.07 [−0.02, +0.20] | −0.10 [−0.24, +0.03] | +0.17 [0.00, +0.50] |
+
+Allowlisted-domain hits over the 48 results per class (same coarse lists as
+§1; supporting evidence, not the decision):
+
+| Class | `lite` auth/comm | `instant` auth/comm | `fast` auth/comm | `auto` auth/comm |
+|---|---|---|---|---|
+| news | 7 / 0 | 9 / 0 | 7 / 0 | 7 / 0 |
+| academic | 15 / 0 | 19 / 0 | 15 / 0 | 15 / 0 |
+| Chinese | 11 / 2 | 8 / 1 | 11 / 2 | 11 / 2 |
+
+Every relevance and authority interval includes zero, and every absolute
+difference is below 0.2 points on the 0–3 scale. `lite`, `fast`, and `auto`
+returned nearly identical URL sets (mean Jaccard 0.988 for `lite` vs `fast`
+and `lite` vs `auto`), so their scores are the same results judged once;
+`instant` returned a different set (0.199 vs `lite`). No quality winner
+emerges at this sample size.
+
+### 7.2 Publication-date coverage
+
+Share of returned results carrying `publishedDate` (48 results per class):
+
+| Class | `lite` | `instant` | `fast` | `auto` | `instant` − `lite` |
+|---|---:|---:|---:|---:|---:|
+| news | 64.6% | 75.0% | 64.6% | 64.6% | +10.4 pp [2.1, 18.8] |
+| academic | 29.2% | 52.1% | 31.2% | 31.2% | +22.9 pp [6.2, 39.6] |
+| Chinese | 52.1% | 77.1% | 52.1% | 52.1% | +25.0 pp [8.3, 39.6] |
+
+`fast` and `auto` track `lite`, not `instant`. The gap is mostly result-set
+composition, not a stripped field: on the eight URLs that `lite` and
+`instant` shared, `instant` had a date for seven and `lite` omitted it for
+one.
+
+`startPublishedDate` windows held in all nine seven-day probes (one query per
+class × `lite`/`instant`/`auto`): 8/8 results dated and zero results before the
+bound. A lower bound set to the request instant did **not** error, but
+collapsed recall to 5 results (news) or 6 (academic, Chinese); all were dated
+the same day or up to seven days ahead (`2026-11-02` to `2026-11-07` versus a
+2026-10-31 request). The bound is enforced; setting it to "now" buys a
+same-day slice and can surface future-dated metadata. Use the start of the
+user's window.
+
+### 7.3 Contents requests
+
+Counts stayed at 8/8 in every one of the 90 contents calls; `lite` never
+returned fewer results than `instant` with the same `highlights`/`text`
+request (0% drop in all 18 paired queries). All 144 results in the `lite`
+highlights calls carried a highlight, and all 144 in the `lite` text calls
+carried text (minimum 93 characters, median 1,200 at the request cap), so the
+documented "uncached results are left out" rule did not trigger for these
+popular queries. It is not evidence that the rule never triggers.
+
+The set still moved: URL overlap with the plain `lite` response was 0.914 for
+`highlights` and 0.697 for `text`. A `text` request replaced about 30% of the
+top-eight URLs without reducing the count — the API refilled the list rather
+than returning a short page. This is not a `lite` cache penalty: `instant`
+with the same requests showed the same churn (0.904 for `highlights`, 0.701
+for `text`).
+
+### 7.4 Latency and cost
+
+Median end-to-end latency over 36 samples per class/type (two passes, single
+egress, directional only):
+
+| Class | `lite` | `instant` | `fast` | `auto` |
+|---|---:|---:|---:|---:|
+| news | 834 ms | 748 ms | 828 ms | 752 ms |
+| academic | 796 ms | 864 ms | 764 ms | 788 ms |
+| Chinese | 856 ms | 856 ms | 850 ms | 817 ms |
+
+The passes returned identical URLs but their medians moved in both directions
+(news `instant` 872 → 722 ms, academic `instant` 1,127 → 838 ms, news `lite`
+799 → 858 ms), so read these as directional; the table is the combined
+36-sample median. Every plain call (18 queries × 4 types)
+returned eight results and billed the flat up-to-10 price:
+`costDollars.total` 0.004 for `lite` and `instant`, 0.007 for `fast` and
+`auto`. No type was consistently faster; the spread is within run-to-run
+movement.
+
+### 7.5 Overlap and the documented `lite` rejections
+
+Mean Jaccard against `lite`: `fast` 0.988, `auto` 0.988, `instant` 0.199.
+`lite` runs the same search family as `fast` (as the docs say) and, in this
+run, `auto` resolved to the same set; `instant` is a different index.
+
+Both documented `lite` rejections returned HTTP 400 and named the field:
+
+- `outputSchema`: `Invalid request body | Not supported with type "lite":
+  outputSchema. Use type "auto" for other parameters.` (`INVALID_REQUEST_BODY`)
+- `contents.summary`: `Invalid request body | Not supported with type "lite":
+  contents.summary. Use type "auto" for other parameters.`
+  (`INVALID_REQUEST_BODY`)
+
+### 7.6 Tavily `include_published_date`
+
+Six news queries at `topic: general`, `search_depth: basic`, eight results:
+
+| Setting | Dated results |
+|---|---:|
+| `include_published_date: true` | 39/48 (81%; per query 7, 8, 8, 4, 8, 4) |
+| flag omitted | 0/16 |
+| `topic: news` (flag omitted, auto-enabled) | 3/3 first pass; 2/3 second |
+
+The flag is opt-in and works on general search, not only `topic: news`; the
+default shape still returns no dates. A raw-response spot check confirms the
+field is `published_date` and carries an RFC 2822 string (for example `Fri, 14
+Mar 2025 12:00:00 GMT`); the collector normalizes it to `YYYY-MM-DD`. Each
+call billed one credit; median latency 2.2–4.1 s on this egress.
+
+### 7.7 Per-class decision
+
+Rule used: blind relevance/authority decides; a difference is "noise" when
+the paired 95% bootstrap interval includes zero and |Δ| < 0.2 points on the
+0–3 scale. Then cost (lite = instant < auto = fast), then forward
+compatibility (lite is recommended, instant/fast legacy). Two vetoes: `lite`
+loses if it returns >20% fewer results than `instant` when contents are
+requested, or if its date coverage is clearly worse. "Clearly worse" here
+means the paired interval excludes zero **and** `lite` has more than 20%
+fewer dated results than `instant`, reusing the same 20% threshold.
+
+| Class | Default | Basis |
+|---|---|---|
+| Current events | `lite` + `startPublishedDate` = start of the window | Quality tie (Δ relevance +0.10, interval crosses zero); same price as `instant`, and forward compatibility favors the recommended type; `lite` has 14% fewer dated results than `instant` (below the veto) and the 7-day window restored 8/8 dated results. |
+| Academic | `instant` (use `lite` only when dates do not matter) | Quality tie (Δ relevance +0.02, +0.03 authority); same price; `lite` dated 29.2% vs 52.1% — 44% fewer dated results than `instant`, veto tripped. `auto` costs 75% more and still tracks `lite` (31.2%). |
+| Chinese | `instant` (use `lite` only when dates do not matter) | Quality tie (Δ relevance +0.07, authority −0.10); same price; `lite` dated 52.1% vs 77.1% — 32% fewer dated results than `instant`, veto tripped. `auto` costs 75% more and still tracks `lite`. |
+
+`auto` is not a quality upgrade in this run: it matched `lite`/`fast` and
+billed 0.007. Use it only for parameters `lite` rejects (`contents.summary`,
+`outputSchema`, `maxAgeHours`). `fast` matched `lite` at 0.007 and is legacy;
+never choose it for cost or quality.
+
+Caveats: six queries per class, one egress, one account, and a small judge
+model; scores are title/URL/date judgments, not page-content verification.
+The date veto is sensitive to how "clearly worse" is defined — the raw gaps
+are in §7.2, and the academic/Chinese conclusions flip to `lite` if the date
+difference is treated as metadata rather than a quality loss.

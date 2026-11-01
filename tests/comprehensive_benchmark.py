@@ -21,8 +21,17 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "search_results"
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
 
 COMMUNITY_DOMAINS = {
     "reddit.com", "news.ycombinator.com", "stackoverflow.com",
@@ -273,6 +282,7 @@ def quality_summary(data, spec):
     canonical_urls = [canonical_url(url) for url in urls if url]
     source_ids = [source_identity(url) for url in urls if url]
     unique_urls = len(set(canonical_urls))
+    unique_sources = len(set(source_ids))
     expected = spec.get("expected_domains") or []
     expected_ranks = [
         rank for rank, actual in enumerate(domains, 1)
@@ -282,8 +292,11 @@ def quality_summary(data, spec):
         "result_count": len(results),
         "unique_urls": unique_urls,
         "duplicate_urls": len(urls) - unique_urls,
-        "unique_sources": len(set(source_ids)),
-        "near_duplicate_urls": len(urls) - len(set(source_ids)),
+        "unique_sources": unique_sources,
+        # Exact repeats are already counted by duplicate_urls; this residual
+        # counts distinct URLs that collapse to one source (abs/pdf, tracking
+        # variants that survive canonicalisation, etc.).
+        "near_duplicate_urls": unique_urls - unique_sources,
         "unique_domains": len(set(domains)),
         "expected_domain_hits": sum(
             any(domain_matches(actual, wanted) for wanted in expected)
@@ -768,38 +781,61 @@ class Benchmark:
         }
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--suite", choices=("all", "modes", "parameters", "extract"), default="all")
-    parser.add_argument("--delay", type=float, default=0.2, help="delay between calls to avoid burst limits")
-    args = parser.parse_args()
-
-    benchmark = Benchmark(args.delay)
-    started = time.time()
-    if args.suite in {"all", "modes"}:
+def run_suites(benchmark, suite):
+    if suite in {"all", "modes"}:
         benchmark.mode_sweep()
-    if args.suite in {"all", "parameters"}:
+    if suite in {"all", "parameters"}:
         benchmark.parameter_matrix()
-    if args.suite in {"all", "extract"}:
+    if suite in {"all", "extract"}:
         benchmark.extraction_matrix()
 
+
+def save(benchmark, suite, started, partial):
     payload = {
         "metadata": {
             "date": date.today().isoformat(),
-            "suite": args.suite,
+            "suite": suite,
             "duration_seconds": round(time.time() - started, 1),
+            "partial": partial,
             "quality_queries": QUALITY_QUERIES,
             "targets": TARGETS,
         },
         "summary": benchmark.aggregate(),
         "cases": benchmark.cases,
     }
-    OUT_DIR.mkdir(exist_ok=True)
-    filename = "comprehensive_benchmark.json" if args.suite == "all" else f"comprehensive_{args.suite}.json"
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    filename = "comprehensive_benchmark.json" if suite == "all" else f"comprehensive_{suite}.json"
     output = OUT_DIR / filename
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nSaved {len(benchmark.cases)} cases -> {output}")
+    return output, payload
+
+
+def finalize(benchmark, suite, started, partial):
+    output, payload = save(benchmark, suite, started, partial)
+    label = "Partial" if partial else "Saved"
+    print(f"\n{label} {len(benchmark.cases)} cases -> {output}")
     print(json.dumps(payload["summary"], ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--suite", choices=("all", "modes", "parameters", "extract"), default="all")
+    parser.add_argument("--delay", type=float, default=0.2, help="delay between calls to avoid burst limits")
+    args = parser.parse_args()
+
+    # Fail on an unwritable output directory before spending any API calls.
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    benchmark = Benchmark(args.delay)
+    started = time.time()
+    try:
+        run_suites(benchmark, args.suite)
+    except BaseException:
+        # Ctrl-C or a mid-run failure: write the cases already paid for,
+        # flagged partial, instead of losing the whole run.
+        finalize(benchmark, args.suite, started, partial=True)
+        raise
+
+    finalize(benchmark, args.suite, started, partial=False)
 
 
 if __name__ == "__main__":

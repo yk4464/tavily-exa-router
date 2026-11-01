@@ -1,0 +1,105 @@
+{
+  "skill_name": "tavily-exa-router",
+  "cases": [
+    {
+      "id": "pos-1",
+      "query": "Check the latest news on the EU AI Act enforcement timeline and keep publication dates.",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-2",
+      "query": "搜一下中文论坛里 Rust 异步运行时上生产踩过的坑，要论坛原帖。",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-3",
+      "query": "Read https://docs.example.com/api/ratelimits and pull out the rate-limit section.",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-4",
+      "query": "What are developers on Reddit and Hacker News saying about the new Bun release?",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-5",
+      "query": "Find the original Mamba paper and two surveys that came after it.",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-6",
+      "query": "Research this company's public announcements from the last week only.",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-7",
+      "query": "Is the foo-router library actually reliable in production? Check official docs and community reports.",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-8",
+      "query": "Grab this changelog page https://example.com/changelog and tell me what changed.",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-9",
+      "query": "给我一份官方迁移指南的候选链接清单，快一点，我自己逐个核验。",
+      "should_trigger": true
+    },
+    {
+      "id": "pos-10",
+      "query": "Use Exa for this one: recent vector-database benchmark posts from the past month.",
+      "should_trigger": true
+    },
+    {
+      "id": "neg-1",
+      "query": "Find where parse_config is defined in this repo and list its callers.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-2",
+      "query": "Summarize the attached PDF and give me the key numbers.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-3",
+      "query": "Use the browser to open https://example.com/dashboard, log in, and screenshot the settings page.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-4",
+      "query": "Use WebSearch to check the capital of France.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-5",
+      "query": "Don't call the search APIs; fetch https://example.com/report with WebFetch and quote the first paragraph.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-6",
+      "query": "Monitor this pricing page every hour and alert me when it changes.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-7",
+      "query": "Open this suspicious URL and tell me whether it is safe to visit.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-8",
+      "query": "What's the exact live price and stock for this GPU right now?",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-9",
+      "query": "Search our internal Confluence for the onboarding checklist.",
+      "should_trigger": false
+    },
+    {
+      "id": "neg-10",
+      "query": "Search my email for the invoice from Acme and forward it to me.",
+      "should_trigger": false
+    }
+  ]
+}

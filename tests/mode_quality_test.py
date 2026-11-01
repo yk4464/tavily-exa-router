@@ -6,14 +6,29 @@ Exa {instant, fast, auto, deep-lite}. Results saved for manual quality review.
 import json
 import os
 import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
+
+OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
 
 
 def post(url, payload, headers, timeout=240, retries=2):
+    # 400/401/403 are permanent: another attempt re-sends the same rejected
+    # parameters. Only 429/5xx and transport errors are worth retrying.
+    permanent = {400, 401, 403}
     for attempt in range(retries + 1):
         try:
             req = urllib.request.Request(
@@ -21,7 +36,11 @@ def post(url, payload, headers, timeout=240, retries=2):
                 headers={"Content-Type": "application/json", **headers}, method="POST")
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.load(r)
-        except Exception as exc:  # noqa: BLE001
+        except urllib.error.HTTPError as exc:
+            if exc.code in permanent or attempt == retries:
+                raise
+            time.sleep(4 * (attempt + 1))
+        except Exception:  # noqa: BLE001 - transport-level: worth retrying
             if attempt == retries:
                 raise
             time.sleep(4 * (attempt + 1))
@@ -66,10 +85,12 @@ def run(job):
 
 
 if __name__ == "__main__":
+    # Fail on an unwritable output directory before spending any API calls.
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(max_workers=5) as ex:
         out = list(ex.map(run, jobs))
-    os.makedirs("search_results", exist_ok=True)
-    with open("search_results/mode_quality.json", "w", encoding="utf-8") as f:
+    output = OUT_DIR / "mode_quality.json"
+    with open(output, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
 
     for svc in ("tavily", "exa"):
@@ -86,4 +107,4 @@ if __name__ == "__main__":
                         else:
                             extra = f" {res.get('d') or 'no-date'}"
                         print(f"     {i}. {res['t'][:66]}{extra}")
-    print("\nsaved -> search_results/mode_quality.json")
+    print(f"\nsaved -> {output}")

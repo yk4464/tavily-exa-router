@@ -7,9 +7,22 @@ import os
 import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
+
+OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
+# Fail on an unwritable output directory before spending any API calls.
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def post(url, payload, headers, timeout=240):
@@ -115,7 +128,7 @@ record("exa:includeDomains(wildcard)", "exa",
        lambda d: f"  {len(d.get('results', []))} results, all substack? "
                  f"{all('substack' in r.get('url', '') for r in d.get('results', []))}")
 
-os.makedirs("search_results", exist_ok=True)
-with open("search_results/features.json", "w", encoding="utf-8") as f:
+output = OUT_DIR / "features.json"
+with open(output, "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False, indent=1)
-print("\nsaved -> search_results/features.json")
+print(f"\nsaved -> {output}")

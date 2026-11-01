@@ -1,12 +1,18 @@
 name: drift-check
 
 on:
+  push:
+  pull_request:
   schedule:
     - cron: "0 3 1 * *" # monthly, 03:00 UTC on the 1st
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  smoke:
+  # Secret-free gate: runs on every push and pull request, forks included.
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,8 +21,29 @@ jobs:
           python-version: "3.12"
       - name: Validate repository
         run: python tests/validate_repo.py
+
+  # Live provider checks: needs API keys, so monthly/dispatch only.
+  smoke:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Run drift checks
-        run: python tests/smoke_test.py
+        shell: bash
+        run: |
+          set +e
+          python tests/smoke_test.py
+          status=$?
+          set -e
+          case "$status" in
+            0) echo "Drift check passed or skipped (no keys configured)." ;;
+            1) echo "::error::fact drift detected — re-test the drifted facts and update SKILL.md and references/" ; exit 1 ;;
+            2) echo "::warning::infrastructure-only failure (network/rate limit/auth) — re-run before treating it as drift" ; exit 2 ;;
+            *) echo "::error::smoke_test.py exited $status" ; exit "$status" ;;
+          esac
         env:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}

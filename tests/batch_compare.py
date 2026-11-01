@@ -10,10 +10,22 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from urllib.parse import urlparse
 
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
+
+OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
+TAVILY_TOPIC = "general"
 
 QUERIES = [
     ("factual", "height of Mount Everest in meters"),
@@ -64,13 +76,11 @@ def post_json(url, payload, headers, timeout=120, retries=2):
 def tavily(q):
     d = post_json("https://api.tavily.com/search",
                   {"query": q, "max_results": 8, "search_depth": "basic",
-                   "include_usage": True},
+                   "topic": TAVILY_TOPIC, "include_usage": True},
                   {"Authorization": f"Bearer {TAVILY_KEY}"})
-    # Read the real date field. This was a literal None before (found
-    # 2026-10-06), which made the "0 of N results carry published_date"
-    # statistic measure this collector rather than the API. Tavily only
-    # populates published_date in some modes, so also request it explicitly
-    # and record the topic so the number is interpretable.
+    # Read the real date field; Tavily only populates published_date in some
+    # modes, and the output row records TAVILY_TOPIC so the "dated" tally is
+    # interpretable rather than a property of this collector.
     return [{"u": r["url"], "t": (r.get("title") or "")[:80],
              "d": r.get("published_date"),
              "s": r.get("score")} for r in d.get("results", [])], d.get("usage")
@@ -101,6 +111,7 @@ def run_pair(indexed_item):
         except Exception as exc:  # noqa: BLE001
             row[name] = {"results": [], "cost": None, "error": str(exc),
                          "elapsed_ms": round((time.perf_counter() - started) * 1000)}
+    row["tavily"]["topic"] = TAVILY_TOPIC
     return row
 
 
@@ -156,6 +167,8 @@ def http_check(url):
 
 
 if __name__ == "__main__":
+    # Fail on an unwritable output directory before spending any API calls.
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=6) as ex:
         rows = list(ex.map(run_pair, enumerate(QUERIES)))
@@ -168,7 +181,8 @@ if __name__ == "__main__":
     with ThreadPoolExecutor(max_workers=10) as ex:
         statuses = dict(ex.map(http_check, check_urls))
 
-    with open("search_results/batch_compare.json", "w", encoding="utf-8") as f:
+    output = OUT_DIR / "batch_compare.json"
+    with open(output, "w", encoding="utf-8") as f:
         json.dump({"rows": rows, "http_status": statuses}, f, ensure_ascii=False, indent=1)
 
     # ---- report ----
@@ -243,3 +257,5 @@ if __name__ == "__main__":
             print(f"  exa  costDollars avg={sum(vals) / len(vals):.4f} max={max(vals):.4f} over {len(vals)} queries")
         elif vals:
             print(f"  tavily credits avg={sum(vals) / len(vals):.2f} max={max(vals):.0f} over {len(vals)} queries")
+
+    print(f"\nsaved -> {output}")

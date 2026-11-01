@@ -3,15 +3,29 @@
 Round A: head-to-head, default-ish params, 5 interleaved runs each.
 Round B: per-service mode/depth sweep, 2 runs each.
 Round C: with content extraction enabled, 3 runs each.
+
+A failed call is recorded and skipped: the remaining samples and rounds still
+run, and every collected timing is written to search_results/speed_test.json.
 """
 import json
 import os
 import statistics
 import time
 import urllib.request
+from pathlib import Path
 
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
+
+OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
 
 
 def post(url, payload, headers, timeout=90):
@@ -31,23 +45,43 @@ def exa(payload):
     post("https://api.exa.ai/search", payload, {"x-api-key": EXA_KEY})
 
 
+def report(label, ms, errors):
+    """Print and return one sample set; empty sample sets stay in the JSON."""
+    entry = {"samples_ms": [round(t, 1) for t in ms], "errors": errors}
+    if ms:
+        entry.update({
+            "n": len(ms),
+            "min_ms": round(min(ms)),
+            "median_ms": round(statistics.median(ms)),
+            "mean_ms": round(statistics.mean(ms)),
+            "max_ms": round(max(ms)),
+        })
+        print(f"  {label:<38} min={entry['min_ms']:6.0f}  med={entry['median_ms']:6.0f}  "
+              f"avg={entry['mean_ms']:6.0f}  max={entry['max_ms']:6.0f} ms  (n={len(ms)})")
+    else:
+        print(f"  {label:<38} no successful samples")
+    return entry
+
+
 def bench(label, fn, payload, runs=3):
-    times = []
+    times, errors = [], []
     for _ in range(runs):
         t0 = time.perf_counter()
         try:
             fn(payload)
-            times.append(time.perf_counter() - t0)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - one failed sample must not end the run
+            errors.append(str(exc))
             print(f"  {label}: ERROR {exc}")
-            return
-    ms = [t * 1000 for t in times]
-    print(f"  {label:<38} min={min(ms):6.0f}  med={statistics.median(ms):6.0f}  "
-          f"avg={statistics.mean(ms):6.0f}  max={max(ms):6.0f} ms  (n={runs})")
-    return statistics.median(ms)
+            continue
+        times.append((time.perf_counter() - t0) * 1000)
+    return report(label, times, errors)
 
 
+results = {"round_a": {}, "round_b": {}, "round_c": {}}
 Q = "artificial intelligence industry trends"
+
+# Fail on an unwritable output directory before spending any API calls.
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 print("=" * 78)
 print("Round A: head-to-head, default params, 5 results, interleaved (5 runs)")
@@ -55,38 +89,53 @@ print("=" * 78)
 t_pl = {"query": Q, "max_results": 5, "search_depth": "basic"}
 e_pl = {"query": Q, "numResults": 5, "type": "auto"}
 # interleave manually: bench helper runs sequentially, so emulate via 1-run passes
-t_times, e_times = [], []
+t_times, e_times, t_errors, e_errors = [], [], [], []
 for i in range(5):
-    for name, fn, pl, acc in (("tavily", tavily, t_pl, t_times), ("exa", exa, e_pl, e_times)):
+    for name, fn, pl, acc, errors in (
+            ("tavily", tavily, t_pl, t_times, t_errors),
+            ("exa", exa, e_pl, e_times, e_errors)):
         t0 = time.perf_counter()
-        fn(pl)
+        try:
+            fn(pl)
+        except Exception as exc:  # noqa: BLE001 - keep the samples already taken
+            errors.append({"run": i + 1, "error": str(exc)})
+            print(f"  {name} run {i + 1}: ERROR {exc}")
+            continue
         acc.append((time.perf_counter() - t0) * 1000)
-for name, acc in (("Tavily basic", t_times), ("Exa auto", e_times)):
-    print(f"  {name:<38} min={min(acc):6.0f}  med={statistics.median(acc):6.0f}  "
-          f"avg={statistics.mean(acc):6.0f}  max={max(acc):6.0f} ms  (n=5)")
+results["round_a"]["tavily_basic"] = report("Tavily basic", t_times, t_errors)
+results["round_a"]["exa_auto"] = report("Exa auto", e_times, e_errors)
 
 print()
 print("=" * 78)
 print("Round B: mode/depth sweep (2 runs each)")
 print("=" * 78)
 for depth in ("ultra-fast", "fast", "basic", "advanced"):
-    bench(f"Tavily search_depth={depth}", tavily,
-          {"query": Q, "max_results": 5, "search_depth": depth}, runs=2)
+    results["round_b"][f"tavily:{depth}"] = bench(
+        f"Tavily search_depth={depth}", tavily,
+        {"query": Q, "max_results": 5, "search_depth": depth}, runs=2)
 for mode in ("instant", "fast", "auto", "deep-lite"):
-    bench(f"Exa type={mode}", exa,
-          {"query": Q, "numResults": 5, "type": mode}, runs=2)
+    results["round_b"][f"exa:{mode}"] = bench(
+        f"Exa type={mode}", exa,
+        {"query": Q, "numResults": 5, "type": mode}, runs=2)
 
 print()
 print("=" * 78)
 print("Round C: with content extraction, 3 results (3 runs)")
 print("=" * 78)
-bench("Tavily include_raw_content=markdown", tavily,
-      {"query": Q, "max_results": 3, "search_depth": "basic",
-       "include_raw_content": "markdown"}, runs=3)
-bench("Exa contents.text maxCharacters=500", exa,
-      {"query": Q, "numResults": 3, "type": "auto",
-       "contents": {"text": {"maxCharacters": 500}}}, runs=3)
-bench("Exa contents.text + highlights", exa,
-      {"query": Q, "numResults": 3, "type": "auto",
-       "contents": {"text": {"maxCharacters": 500},
-                    "highlights": {"maxCharacters": 300}}}, runs=3)
+results["round_c"]["tavily:raw_markdown"] = bench(
+    "Tavily include_raw_content=markdown", tavily,
+    {"query": Q, "max_results": 3, "search_depth": "basic",
+     "include_raw_content": "markdown"}, runs=3)
+results["round_c"]["exa:text_500"] = bench(
+    "Exa contents.text maxCharacters=500", exa,
+    {"query": Q, "numResults": 3, "type": "auto",
+     "contents": {"text": {"maxCharacters": 500}}}, runs=3)
+results["round_c"]["exa:text_highlights"] = bench(
+    "Exa contents.text + highlights", exa,
+    {"query": Q, "numResults": 3, "type": "auto",
+     "contents": {"text": {"maxCharacters": 500},
+                  "highlights": {"maxCharacters": 300}}}, runs=3)
+
+output = OUT_DIR / "speed_test.json"
+output.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+print(f"\nsaved -> {output}")

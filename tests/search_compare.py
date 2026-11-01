@@ -6,10 +6,21 @@ saves raw JSON, and prints a compact per-result summary for analysis.
 import json
 import os
 import urllib.request
+from pathlib import Path
 from urllib.parse import urlparse
 
-TAVILY_KEY = os.environ["TAVILY_API_KEY"]
-EXA_KEY = os.environ["EXA_API_KEY"]
+
+def api_key(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"missing environment variable {name}; set it before running this script")
+    return value
+
+
+TAVILY_KEY = api_key("TAVILY_API_KEY")
+EXA_KEY = api_key("EXA_API_KEY")
+
+OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
 
 QUERIES = [
     ("chinese", "2026年国产大模型开源最新进展"),
@@ -64,7 +75,7 @@ def trunc(s, n=70):
     return s[: n - 1] + "…" if len(s) > n else s
 
 
-os.makedirs("search_results", exist_ok=True)
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 for label, q in QUERIES:
     print(f"\n{'=' * 80}\nQUERY [{label}]: {q}\n{'=' * 80}")
@@ -74,7 +85,8 @@ for label, q in QUERIES:
         except Exception as exc:  # noqa: BLE001
             print(f"\n--- {name} ERROR: {exc}")
             continue
-        with open(f"search_results/{label}_{name.lower()}.json", "w", encoding="utf-8") as f:
+        output = OUT_DIR / f"{label}_{name.lower()}.json"
+        with open(output, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         results = data.get("results", [])
         print(f"\n--- {name} ({len(results)} results, response_time={data.get('response_time', 'n/a')})")
