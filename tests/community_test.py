@@ -16,8 +16,8 @@ def api_key(name):
     return value
 
 
-TAVILY_KEY = api_key("TAVILY_API_KEY")
-EXA_KEY = api_key("EXA_API_KEY")
+TAVILY_KEY = None
+EXA_KEY = None
 
 
 def post(url, payload, headers):
@@ -34,8 +34,8 @@ def tavily(query):
                 {"Authorization": f"Bearer {TAVILY_KEY}"})["results"]
 
 
-def exa(query, category=None):
-    payload = {"query": query, "numResults": 8, "type": "auto",
+def exa(query, category=None, exa_type="lite"):
+    payload = {"query": query, "numResults": 8, "type": exa_type,
                "contents": {"text": {"maxCharacters": 200}}}
     if category:
         payload["category"] = category
@@ -69,15 +69,35 @@ def show(name, results):
         print(f"  {i}.{mark} [{d}] {trunc(r.get('title'), 55)}")
 
 
-for label, q in [
-    ("EN-community", "tailwind css criticism real developer experience"),
-    ("CN-community", "Rust 生产环境使用经验 踩坑"),
-]:
-    print(f"\n{'=' * 78}\nQUERY [{label}]: {q}")
-    show("Tavily basic", tavily(q))
-    show("Exa auto", exa(q))
+def safe_show(name, fn):
+    try:
+        show(name, fn())
+    except Exception as exc:  # noqa: BLE001
+        print(f"\n--- {name}: ERROR {exc}")
 
-# Exa's dedicated community-ish category for reference
-print(f"\n{'=' * 78}\n[Exa category='personal site' variant]")
-show("Exa auto + personal site", exa("tailwind css criticism real developer experience",
-                                     category="personal site"))
+
+def main():
+    global TAVILY_KEY, EXA_KEY
+    TAVILY_KEY = api_key("TAVILY_API_KEY")
+    EXA_KEY = api_key("EXA_API_KEY")
+
+    for label, q in [
+        ("EN-community", "tailwind css criticism real developer experience"),
+        ("CN-community", "Rust 生产环境使用经验 踩坑"),
+    ]:
+        print(f"\n{'=' * 78}\nQUERY [{label}]: {q}")
+        safe_show("Tavily basic", lambda q=q: tavily(q))
+        safe_show("Exa lite", lambda q=q: exa(q, exa_type="lite"))
+        safe_show("Exa deep", lambda q=q: exa(q, exa_type="deep"))
+
+    # Exa's dedicated community-ish category for reference
+    print(f"\n{'=' * 78}\n[Exa category='personal site' variant]")
+    safe_show(
+        "Exa lite + personal site",
+        lambda: exa("tailwind css criticism real developer experience",
+                    category="personal site", exa_type="lite"),
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,5 +1,115 @@
 # Changelog
 
+## 1.6.0 — 2026-11-18
+
+Structural rewrite of `SKILL.md` and full 2026-11-18 re-benchmark, parameter
+sweep (`136` probes), and blind quality evaluation (`39` queries, `825` unique
+results).
+
+### `SKILL.md` structural rewrite (218 lines; `description` unchanged)
+
+- **Deduplicated overlapping rules** across Entry flow, Scope, Routing by task,
+  Mode selection, and Parameters (`company`/`people` filters, `outputSchema`
+  limits, `lite` rejections, `score` triage, `startPublishedDate` windowing,
+  and Tavily `published_date` opt-in).
+- **Tightened entry and scope**: removed the opening restatement of
+  `description`, moved Scope gate #4 (result-count caps and Exa per-result
+  surcharge) into `Parameters`, and moved HTTP 400 / unsupported-combination
+  handling into `Entry flow` → `Call`.
+- **Clarified pricing and site quirks**: stated explicitly that `outputSchema`
+  adds no separate charge beyond the search request's base price, and merged
+  site-specific fetch quirks into one concise line.
+- **Removed generic rules**: dropped the `State` step from `Entry flow`,
+  `"Verify the author"`, merge-result sort ordering, and generic `Second
+  opinion` prose; compressed `Untrusted web content` by ~50% while retaining
+  snippet/synthesis untrustedness, injection ignoring, and neutral reporting.
+
+### Evidence-backed routing and reference updates (2026-11-18)
+
+- **Academic queries flipped from `instant` to `lite`** (small sample: `n=6`
+  academic queries in `lite_quality_test.py`): `lite` matched or exceeded
+  `instant` on dated share (`56.2%` vs `52.1%`), tied on blind relevance and
+  authority (`95%` paired CIs crossing zero), and ran faster (`927` vs `1,556`
+  ms).
+- **`instant` retained solely for Chinese queries when dates matter**: in the
+  2026-11-18 re-test, `instant` lost its date-coverage lead on news (`68.8%`
+  vs `lite` `76.1%`) and academic queries, keeping it only on Chinese (`79.2%`
+  vs `54.2%`, plus higher blind relevance and timeliness). Dated product
+  reviews (which previously borrowed the cross-class rationale without separate
+  measurement) therefore revert to `lite`.
+- **Updated 13-site fetch quirks**: Tieba and Reddit are unavailable on both
+  providers; Zhihu returns a login wall on both; Bilibili returns a login wall
+  on Tavily and succeeds on Exa only at `maxAgeHours: 24`; X returns a login
+  shell on Tavily and `SOURCE_NOT_AVAILABLE` on Exa; Linux.do is usable on Exa.
+- **Parameter & plan boundaries**: recorded Exa `snapshotAsOf` returning
+  `403 SNAPSHOT_NOT_ON_PLAN` on the free tier (`references/exa.md`) and
+  Tavily server-side leniency (`max_results: 21`, `chunks_per_source: 4`,
+  `extract` `timeout: 61` / `1–120 s` error text in `references/tavily.md`),
+  while keeping conservative documented limits in `SKILL.md`.
+- **Docs & evals synced**: appended `references/evidence.md` §8, updated
+  `README.md`, `README_EN.md`, `references/exa.md`, `references/tavily.md`,
+  and `evals/evals.json` (cases 4 and 24 updated from `instant` to `lite`).
+
+## 1.5.1 — 2026-11-18
+
+Documentation, evals, and CI/test-suite alignment release following the 1.5.0
+streamlining (`SKILL.md` routing rules unchanged; only `metadata.version`
+bumped).
+
+### Rules alignment across READMEs, references, and evals
+
+- **Removed three leftover failure-handling rules** from `README.md`,
+  `README_EN.md`, and `evals/evals.json` (cases 4 and 21): `5xx/timeout
+  retries once, then switches provider`, `name the failed attempts` on
+  built-in retrieval fallback, and `fall back to lite if instant is
+  rejected/retired`. Models can make these runtime calls directly without
+  script-like rules, and `SKILL.md` 1.5.0 already omitted all three.
+- **Correction to the 1.5.0 changelog record below** (kept verbatim): the
+  1.5.0 notes inaccurately described `SKILL.md` as retaining `5xx/timeout
+  retries once` and `with the failed attempts named` (and described the READMEs
+  as keeping the dropped retry timings). Neither `SKILL.md` nor the READMEs
+  retained those retry timings, and `SKILL.md` 1.5.0 kept none of those three
+  rules.
+- **Synced stale phrasing and recipes to `SKILL.md`**:
+  - `README.md` / `README_EN.md`: fixed the news usage-example fallback (rerun
+    as `auto` when `highlights`/`text` are thin and switch on call failure,
+    instead of retrying empty results), changed `README_EN.md` `"never handed
+    to generic fetchers"` to `"do not hand directly to generic WebFetch"`,
+    labeled `USD 0.007` as the `auto` base (noting the `lite` default is
+    `USD 0.004`), and restored the requirement that the user accepts the
+    per-result surcharge before increasing `numResults`.
+  - `references/exa.md`: separated the Exa API default (`auto`) from this
+    skill's default (`lite`, keeping `instant` for date-coverage rows), and
+    updated recipes to specify `lite`/`instant`, window-start
+    `startPublishedDate`, and un-locked `arxiv.org` in the academic sweep.
+  - `references/tavily.md`: changed the direct-answer recipe from
+    `include_answer: "advanced"` to `"basic"`.
+  - `MAINTENANCE.md`: fixed the major-bump reversal example from `"Exa wins
+    Chinese content"` to `"Tavily wins Chinese content"`.
+
+### Tests and CI (`tests/` & `.github/workflows/drift-check.yml`)
+
+- **`tests/smoke_test.py`**: classified HTTP `402` and Tavily quota statuses
+  `432`/`433` under `AUTH_OR_QUOTA_STATUSES` (infrastructure exit 2 instead of
+  drift exit 1), added `434` (`Flex tier capacity exceeded`) to
+  `RETRY_STATUSES`, and broadened `post()` exception handling to
+  `(urllib.error.URLError, http.client.HTTPException, OSError)` so body-read
+  `IncompleteRead` and `SSLError` trigger retries and infrastructure
+  classification.
+- **`.github/workflows/drift-check.yml`**: added `timeout-minutes` (`10` for
+  `validate`, `20` for `smoke`), unbuffered `python -u tests/smoke_test.py`, a
+  single 30 s retry on `exit 2` (still failing visibly on repeated `exit 2`
+  rather than masking it), and `$GITHUB_STEP_SUMMARY` annotations
+  distinguishing infrastructure failures from fact drift.
+- **`tests/validate_repo.py`**: replaced substring placeholder matching in leak
+  checks with `is_placeholder()` / `is_placeholder_token()`, added structural
+  validation for `evals/trigger-set.json` and non-empty `expectations` checks
+  for `evals/evals.json`, preserved paragraph-level `references/*.md` context
+  for multi-line `§` anchors, and stripped trailing `#` comments on
+  frontmatter scalars.
+- **`tests/README.md`**: updated `smoke_test.py` and `validate_repo.py`
+  descriptions to match the new behavior.
+
 ## 1.5.0 — 2026-10-31
 
 `SKILL.md` reworked (358 → 273 lines) around a new measurement of Exa's

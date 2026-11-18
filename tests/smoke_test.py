@@ -9,27 +9,18 @@ nonzero when a documented fact has drifted, so CI can flag it.
 Exit codes keep the two kinds of red run apart:
     0  every check passed (or the secrets were absent)
     1  a documented fact drifted — re-test it and update the docs
-    2  infrastructure failed only (network, rate limit, 5xx, auth) — re-run;
-       the run says nothing about drift
+    2  infrastructure failed only (network, rate limit, 5xx, auth, quota) —
+       re-run; the run says nothing about drift
 """
 import datetime
 import email.utils
+import http.client
 import json
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
-
-TAVILY_KEY = os.environ.get("TAVILY_API_KEY")
-EXA_KEY = os.environ.get("EXA_API_KEY")
-
-if not TAVILY_KEY or not EXA_KEY:
-    missing = [name for name, value in (("TAVILY_API_KEY", TAVILY_KEY),
-                                        ("EXA_API_KEY", EXA_KEY)) if not value]
-    print("SKIP: set TAVILY_API_KEY and EXA_API_KEY to enable drift checks.")
-    print(f"::warning::drift check skipped — missing {', '.join(missing)}")
-    sys.exit(0)
 
 # Documented Exa prices per request with up to 10 results, from SKILL.md
 # "Mode selection"; Tavily bills credits per search_depth. Prices are the
@@ -43,14 +34,12 @@ EXA_DEEP_REASONING = 0.015
 EXA_PER_RESULT = 0.001  # each returned result beyond 10
 PRICE_TOL = 1e-6
 
-RETRY_STATUSES = {408, 429, 500, 502, 503, 504}
-AUTH_STATUSES = {401, 403}
+RETRY_STATUSES = {408, 429, 434, 500, 502, 503, 504}
+AUTH_OR_QUOTA_STATUSES = {401, 402, 403, 432, 433}
 MAX_ATTEMPTS = 3
 
 QUERY = "python requests library"
 EXA_SEARCH = "https://api.exa.ai/search"
-EXA_HEADERS = {"x-api-key": EXA_KEY}
-TAVILY_HEADERS = {"Authorization": f"Bearer {TAVILY_KEY}"}
 
 
 class ProviderError(Exception):
@@ -106,11 +95,11 @@ def post(url, payload, headers):
                     continue
                 raise ProviderError(
                     f"HTTP {exc.code} after {MAX_ATTEMPTS} attempts") from exc
-            if exc.code in AUTH_STATUSES:
+            if exc.code in AUTH_OR_QUOTA_STATUSES:
                 raise ProviderError(
-                    f"HTTP {exc.code} — check the API key and plan") from exc
+                    f"HTTP {exc.code} — check the API key, plan, or quota") from exc
             raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+        except (urllib.error.URLError, http.client.HTTPException, OSError) as exc:
             if not last:
                 time.sleep(2.0 * (attempt + 1))
                 continue
@@ -247,18 +236,6 @@ def credit_bill(expected):
     return evaluate
 
 
-# Tavily: search_depth is the only documented cost lever (1 vs 2 credits),
-# and /extract bills 1 credit for a single URL.
-fetch("tavily basic", "https://api.tavily.com/search",
-      {"query": QUERY, "max_results": 3, "search_depth": "basic",
-       "include_usage": True}, TAVILY_HEADERS)
-fetch("tavily extract", "https://api.tavily.com/extract",
-      {"urls": ["https://example.com"]}, TAVILY_HEADERS)
-fetch("tavily advanced", "https://api.tavily.com/search",
-      {"query": QUERY, "max_results": 3, "search_depth": "advanced",
-       "include_usage": True}, TAVILY_HEADERS)
-
-
 def tavily_basic_works(data):
     found = data.get("results") or []
     return bool(found), f"{len(found)} results"
@@ -271,80 +248,109 @@ def tavily_extract_works(data):
             f"{len(items)} url(s), raw_content {size} chars")
 
 
-check("Tavily basic search returns results", "tavily basic",
-      tavily_basic_works)
-check("Tavily basic bills 1 credit", "tavily basic", credit_bill(1))
-check("Tavily /extract fetches a public page", "tavily extract",
-      tavily_extract_works)
-check("Tavily advanced bills 2 credits", "tavily advanced", credit_bill(2))
-
-# Exa: one call per documented price tier, all inside the up-to-10-result
-# band where the per-request price is flat.
-fetch("exa auto", EXA_SEARCH,
-      {"query": QUERY, "numResults": 10, "type": "auto"}, EXA_HEADERS)
-fetch("exa instant", EXA_SEARCH,
-      {"query": QUERY, "numResults": 3, "type": "instant"}, EXA_HEADERS)
-fetch("exa lite", EXA_SEARCH,
-      {"query": QUERY, "numResults": 3, "type": "lite"}, EXA_HEADERS)
-fetch("exa deep", EXA_SEARCH,
-      {"query": QUERY, "numResults": 3, "type": "deep"}, EXA_HEADERS)
-fetch("exa deep-lite", EXA_SEARCH,
-      {"query": QUERY, "numResults": 3, "type": "deep-lite"}, EXA_HEADERS)
-fetch("exa deep-reasoning", EXA_SEARCH,
-      {"query": QUERY, "numResults": 3, "type": "deep-reasoning"}, EXA_HEADERS)
-# 11 results is the smallest request that crosses the free band; billing
-# follows what comes back, so a thin index makes this check inconclusive.
-fetch("exa eleven", EXA_SEARCH,
-      {"query": QUERY, "numResults": 11, "type": "auto"}, EXA_HEADERS)
-
-
 def exa_auto_works(data):
     found = data.get("results") or []
     return bool(found), f"{len(found)} results"
 
 
-check("Exa auto search returns results", "exa auto", exa_auto_works)
-check("Exa auto (up to 10 results) costs USD 0.007", "exa auto",
-      price(EXA_AUTO))
-check("Exa instant (up to 10 results) costs USD 0.004", "exa instant",
-      price(EXA_INSTANT))
-check("Exa lite (up to 10 results) costs USD 0.004", "exa lite",
-      price(EXA_LITE))
-check("Exa deep (up to 10 results) costs USD 0.012", "exa deep",
-      price(EXA_DEEP))
-check("Exa deep-lite (up to 10 results) costs USD 0.012", "exa deep-lite",
-      price(EXA_DEEP))
-check("Exa deep-reasoning (up to 10 results) costs USD 0.015",
-      "exa deep-reasoning", price(EXA_DEEP_REASONING))
-check("Exa results beyond 10 add USD 0.001 each", "exa eleven",
-      linear_price)
+def main():
+    tavily_key = os.environ.get("TAVILY_API_KEY")
+    exa_key = os.environ.get("EXA_API_KEY")
+    if not tavily_key or not exa_key:
+        missing = [name for name, value in (("TAVILY_API_KEY", tavily_key),
+                                            ("EXA_API_KEY", exa_key)) if not value]
+        print("SKIP: set TAVILY_API_KEY and EXA_API_KEY to enable drift checks.")
+        print(f"::warning::drift check skipped — missing {', '.join(missing)}")
+        return 0
 
-# Documented pitfall: company category + startPublishedDate => HTTP 400.
-fetch("exa company+date", EXA_SEARCH,
-      {"query": "example", "numResults": 2, "category": "company",
-       "startPublishedDate": "2026-01-01T00:00:00Z"}, EXA_HEADERS)
-check_rejected("Exa company+date still rejected (400)", "exa company+date",
-               400)
+    results.clear()
+    fetched.clear()
+    exa_headers = {"x-api-key": exa_key}
+    tavily_headers = {"Authorization": f"Bearer {tavily_key}"}
 
-# Documented pitfall: `lite` accepts a restricted parameter set and rejects
-# `outputSchema` with a 400 that names the field.
-fetch("exa lite+outputSchema", EXA_SEARCH,
-      {"query": QUERY, "numResults": 3, "type": "lite",
-       "outputSchema": {"type": "object",
-                        "properties": {"answer": {"type": "string"}}}},
-      EXA_HEADERS)
-check_rejected("Exa lite rejects outputSchema (400, field named)",
-               "exa lite+outputSchema", 400, field="outputSchema")
+    # Tavily: search_depth is the only documented cost lever (1 vs 2 credits),
+    # and /extract bills 1 credit for a single URL.
+    fetch("tavily basic", "https://api.tavily.com/search",
+          {"query": QUERY, "max_results": 3, "search_depth": "basic",
+           "include_usage": True}, tavily_headers)
+    fetch("tavily extract", "https://api.tavily.com/extract",
+          {"urls": ["https://example.com"]}, tavily_headers)
+    fetch("tavily advanced", "https://api.tavily.com/search",
+          {"query": QUERY, "max_results": 3, "search_depth": "advanced",
+           "include_usage": True}, tavily_headers)
 
-tally = {status: sum(1 for _, s in results if s == status)
-         for status in (PASS, DRIFT, ERROR, SKIP)}
-print(f"\n{tally[PASS]}/{len(results)} checks passed"
-      f" (drift {tally[DRIFT]}, infrastructure {tally[ERROR]},"
-      f" inconclusive {tally[SKIP]}).")
-if tally[DRIFT]:
-    print("Re-test the drifted facts, then update SKILL.md and references.")
-    sys.exit(1)
-if tally[ERROR]:
-    print("Only infrastructure failed; re-run before touching the docs.")
-    sys.exit(2)
-sys.exit(0)
+    check("Tavily basic search returns results", "tavily basic",
+          tavily_basic_works)
+    check("Tavily basic bills 1 credit", "tavily basic", credit_bill(1))
+    check("Tavily /extract fetches a public page", "tavily extract",
+          tavily_extract_works)
+    check("Tavily advanced bills 2 credits", "tavily advanced", credit_bill(2))
+
+    # Exa: one call per documented price tier, all inside the up-to-10-result
+    # band where the per-request price is flat.
+    fetch("exa auto", EXA_SEARCH,
+          {"query": QUERY, "numResults": 10, "type": "auto"}, exa_headers)
+    fetch("exa instant", EXA_SEARCH,
+          {"query": QUERY, "numResults": 3, "type": "instant"}, exa_headers)
+    fetch("exa lite", EXA_SEARCH,
+          {"query": QUERY, "numResults": 3, "type": "lite"}, exa_headers)
+    fetch("exa deep", EXA_SEARCH,
+          {"query": QUERY, "numResults": 3, "type": "deep"}, exa_headers)
+    fetch("exa deep-lite", EXA_SEARCH,
+          {"query": QUERY, "numResults": 3, "type": "deep-lite"}, exa_headers)
+    fetch("exa deep-reasoning", EXA_SEARCH,
+          {"query": QUERY, "numResults": 3, "type": "deep-reasoning"}, exa_headers)
+    # 11 results is the smallest request that crosses the free band; billing
+    # follows what comes back, so a thin index makes this check inconclusive.
+    fetch("exa eleven", EXA_SEARCH,
+          {"query": QUERY, "numResults": 11, "type": "auto"}, exa_headers)
+
+    check("Exa auto search returns results", "exa auto", exa_auto_works)
+    check("Exa auto (up to 10 results) costs USD 0.007", "exa auto",
+          price(EXA_AUTO))
+    check("Exa instant (up to 10 results) costs USD 0.004", "exa instant",
+          price(EXA_INSTANT))
+    check("Exa lite (up to 10 results) costs USD 0.004", "exa lite",
+          price(EXA_LITE))
+    check("Exa deep (up to 10 results) costs USD 0.012", "exa deep",
+          price(EXA_DEEP))
+    check("Exa deep-lite (up to 10 results) costs USD 0.012", "exa deep-lite",
+          price(EXA_DEEP))
+    check("Exa deep-reasoning (up to 10 results) costs USD 0.015",
+          "exa deep-reasoning", price(EXA_DEEP_REASONING))
+    check("Exa results beyond 10 add USD 0.001 each", "exa eleven",
+          linear_price)
+
+    # Documented pitfall: company category + startPublishedDate => HTTP 400.
+    fetch("exa company+date", EXA_SEARCH,
+          {"query": "example", "numResults": 2, "category": "company",
+           "startPublishedDate": "2026-01-01T00:00:00Z"}, exa_headers)
+    check_rejected("Exa company+date still rejected (400)", "exa company+date",
+                   400)
+
+    # Documented pitfall: `lite` accepts a restricted parameter set and rejects
+    # `outputSchema` with a 400 that names the field.
+    fetch("exa lite+outputSchema", EXA_SEARCH,
+          {"query": QUERY, "numResults": 3, "type": "lite",
+           "outputSchema": {"type": "object",
+                            "properties": {"answer": {"type": "string"}}}},
+          exa_headers)
+    check_rejected("Exa lite rejects outputSchema (400, field named)",
+                   "exa lite+outputSchema", 400, field="outputSchema")
+
+    tally = {status: sum(1 for _, s in results if s == status)
+             for status in (PASS, DRIFT, ERROR, SKIP)}
+    print(f"\n{tally[PASS]}/{len(results)} checks passed"
+          f" (drift {tally[DRIFT]}, infrastructure {tally[ERROR]},"
+          f" inconclusive {tally[SKIP]}).")
+    if tally[DRIFT]:
+        print("Re-test the drifted facts, then update SKILL.md and references.")
+        return 1
+    if tally[ERROR]:
+        print("Only infrastructure failed; re-run before touching the docs.")
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

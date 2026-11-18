@@ -14,6 +14,7 @@ jobs:
   # Secret-free gate: runs on every push and pull request, forks included.
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,6 +27,7 @@ jobs:
   smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,14 +37,41 @@ jobs:
         shell: bash
         run: |
           set +e
-          python tests/smoke_test.py
+          python -u tests/smoke_test.py
           status=$?
+          if [ "$status" -eq 2 ]; then
+            echo "::warning::infrastructure-only failure (exit 2) — waiting 30s and retrying once"
+            sleep 30
+            python -u tests/smoke_test.py
+            status=$?
+          fi
           set -e
           case "$status" in
-            0) echo "Drift check passed or skipped (no keys configured)." ;;
-            1) echo "::error::fact drift detected — re-test the drifted facts and update SKILL.md and references/" ; exit 1 ;;
-            2) echo "::warning::infrastructure-only failure (network/rate limit/auth) — re-run before treating it as drift" ; exit 2 ;;
-            *) echo "::error::smoke_test.py exited $status" ; exit "$status" ;;
+            0)
+              echo "Drift check passed or skipped (no keys configured)."
+              echo "### Smoke check passed (or skipped without API keys)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            1)
+              echo "::error::fact drift detected — re-test the drifted facts and update SKILL.md and references/"
+              {
+                echo "### Fact drift detected (exit 1)"
+                echo "One or more documented facts drifted. Re-test the drifted facts and update \`SKILL.md\` and \`references/\`."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            2)
+              echo "::warning::infrastructure-only failure persisted after retry (network/rate limit/auth/quota) — NOT fact drift"
+              {
+                echo "### Infrastructure failure — NOT fact drift (exit 2)"
+                echo "Both attempts failed only due to provider infrastructure, rate limits, auth, or quota. Do not edit \`SKILL.md\`; inspect the log and re-run."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 2
+              ;;
+            *)
+              echo "::error::smoke_test.py exited $status"
+              echo "### Unexpected smoke check failure (exit $status)" >> "$GITHUB_STEP_SUMMARY"
+              exit "$status"
+              ;;
           esac
         env:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

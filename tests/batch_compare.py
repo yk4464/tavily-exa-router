@@ -1,7 +1,8 @@
 """Phase 3c+3d: batch comparison over 20 categorized queries + link validity + cost.
 
-Concurrency: 6 workers for API calls, 10 for HTTP spot-checks.
+Concurrency: 4 workers for API calls, 10 for HTTP spot-checks.
 """
+import argparse
 import json
 import math
 import os
@@ -21,11 +22,12 @@ def api_key(name):
     return value
 
 
-TAVILY_KEY = api_key("TAVILY_API_KEY")
-EXA_KEY = api_key("EXA_API_KEY")
+TAVILY_KEY = None
+EXA_KEY = None
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
 TAVILY_TOPIC = "general"
+EXA_TYPE = "lite"
 
 QUERIES = [
     ("factual", "height of Mount Everest in meters"),
@@ -88,7 +90,7 @@ def tavily(q):
 
 def exa(q):
     d = post_json("https://api.exa.ai/search",
-                  {"query": q, "numResults": 8, "type": "auto"},
+                  {"query": q, "numResults": 8, "type": EXA_TYPE},
                   {"x-api-key": EXA_KEY})
     return [{"u": r["url"], "t": (r.get("title") or "")[:80],
              "d": (r.get("publishedDate") or "")[:10], "s": None}
@@ -112,6 +114,7 @@ def run_pair(indexed_item):
             row[name] = {"results": [], "cost": None, "error": str(exc),
                          "elapsed_ms": round((time.perf_counter() - started) * 1000)}
     row["tavily"]["topic"] = TAVILY_TOPIC
+    row["exa"]["type"] = EXA_TYPE
     return row
 
 
@@ -166,11 +169,22 @@ def http_check(url):
         return url, getattr(e, "code", "err")
 
 
-if __name__ == "__main__":
+def main():
+    global TAVILY_KEY, EXA_KEY, OUT_DIR, EXA_TYPE
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out-dir", type=Path, default=OUT_DIR, help="directory for raw JSON output")
+    parser.add_argument("--exa-type", default=EXA_TYPE, help="Exa search type (default: lite)")
+    args = parser.parse_args()
+
+    TAVILY_KEY = api_key("TAVILY_API_KEY")
+    EXA_KEY = api_key("EXA_API_KEY")
+    OUT_DIR = args.out_dir
+    EXA_TYPE = args.exa_type
+
     # Fail on an unwritable output directory before spending any API calls.
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=4) as ex:
         rows = list(ex.map(run_pair, enumerate(QUERIES)))
 
     # HTTP spot-check: up to 3 URLs per query per service
@@ -259,3 +273,7 @@ if __name__ == "__main__":
             print(f"  tavily credits avg={sum(vals) / len(vals):.2f} max={max(vals):.0f} over {len(vals)} queries")
 
     print(f"\nsaved -> {output}")
+
+
+if __name__ == "__main__":
+    main()

@@ -7,17 +7,18 @@ output into `search_results/` (git-ignored — the curated summary lives in
 
 | Script | What it measures | Approx. cost per full run |
 |---|---|---|
-| `search_compare.py` | Same query on both services, side by side | ~$0.01 + 2 credits |
-| `speed_test.py` | Latency: defaults, mode sweep, content extraction | ~$0.05 + ~30 credits |
-| `community_test.py` | Community/forum content coverage (EN+CN) | ~$0.02 + 2 credits |
-| `extract_test.py` | Legacy focused fetch matrix on 5 community sites | ~free + 2 credits |
-| `mode_quality_test.py` | Result quality across search modes/depths | ~$0.10 + 24 credits |
+| `search_compare.py` | Same query on both services, side by side | ~$0.021 + 3 credits |
+| `speed_test.py` | Latency: defaults (`basic`/`lite`/`instant`/`auto`), mode sweep, content extraction | ~$0.22 + 18 credits |
+| `community_test.py` | Community/forum content coverage (EN+CN) | ~$0.04 + 2 credits |
+| `extract_test.py` | Legacy focused fetch matrix on 5 community sites | ~$0.005 + 1 credit |
+| `mode_quality_test.py` | Result quality across search modes/depths | ~$0.18 + 16 credits |
 | `lite_quality_test.py` | Exa `lite` vs `instant`/`fast`/`auto` on news, academic, and Chinese queries: counts, dates, allowlist hits, latency, cost, contents-drop ratio, `startPublishedDate` windows, `lite` 400s, and Tavily `include_published_date` coverage. Writes `search_results/lite_quality.json`; blind quality scoring runs outside the script | ~$1.68 + 9 credits |
 | `feature_test.py` | 14 special-feature checks (params, gotchas) | ~$0.05 + 6 credits |
-| `batch_compare.py` | 20 categorized queries + link checks + cost | ~$0.14 + 20 credits |
-| `smoke_test.py` | **Drift check**: 14 load-bearing facts (Tavily basic/advanced credits, Exa per-type prices including `lite`, the per-result surcharge above 10, `company` + date rejected, `lite` + `outputSchema` rejected with the field named). Exit 0 = pass or skipped (no keys; emits a `::warning::`), 1 = drift, 2 = infrastructure-only failure (network, rate limit, 401/403) — re-run before editing docs | ~$0.062 + 4 credits |
-| `validate_repo.py` | Repo hygiene: frontmatter, leaks, version alignment, evals, reference and `§` anchor integrity, and a rule-only `SKILL.md` (no dates, `references/…` paths or `§` anchors) | free |
+| `batch_compare.py` | 20 categorized queries (default Exa `lite`, `--exa-type` configurable) + link checks + cost | ~$0.08 + 20 credits |
+| `smoke_test.py` | **Drift check**: 14 load-bearing facts (Tavily basic/advanced credits, Exa per-type prices including `lite`, the per-result surcharge above 10, `company` + date rejected, `lite` + `outputSchema` rejected with the field named). Exit 0 = pass or skipped (no keys; emits a `::warning::`), 1 = drift, 2 = infrastructure-only failure (network, rate limit, 5xx, auth, or quota `402`/`432`/`433`/`434`) — CI waits 30s and retries once on exit 2, and fails with a step summary if it persists; re-run before editing docs | ~$0.062 + 4 credits |
+| `validate_repo.py` | Repo hygiene: frontmatter, leaks, version alignment, `evals/evals.json` and `evals/trigger-set.json` structure, reference and `§` anchor integrity, and a rule-only `SKILL.md` (no dates, `references/…` paths or `§` anchors) | free |
 | `comprehensive_benchmark.py` | Search/Extract/Contents modes, parameters, boundaries, paired semantic checks, SSE parsing, and a 13-site fetch matrix | variable; prints recorded usage/cost |
+| `param_sweep.py` | Full official `/search` parameter scan, key `/extract`/`/contents` parameters, documented 400s/deprecations, and `SKILL.md` factual probes (supports `--resume`) | ~$0.36 + ~47 credits |
 
 The comprehensive benchmark intentionally avoids a meaningless Cartesian
 product. It tests every in-scope parameter independently, every documented

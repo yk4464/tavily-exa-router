@@ -54,10 +54,13 @@ def scalar_value(key):
     if head[0] in "\"'":
         quote = head[0]
         joined = " ".join([head] + [line.strip() for line in body]).strip()
-        if len(joined) > 1 and joined.endswith(quote):
-            return "ok", joined[1:-1].replace("\\n", "\n")
+        # Strip a trailing inline YAML comment outside the closing quote.
+        m_q = re.match(rf"^{re.escape(quote)}(.*){re.escape(quote)}(?:\s+#.*)?$", joined)
+        if m_q and len(joined) > 1:
+            return "ok", m_q.group(1).replace("\\n", "\n")
         return "unparsed", ""
-    text = " ".join([head] + [line.strip() for line in body if line.strip()])
+    lines = [re.sub(r"\s+#.*$", "", line.strip()) for line in [head] + body]
+    text = " ".join(part for part in lines if part)
     return ("ok", text) if text else ("unparsed", "")
 
 
@@ -141,11 +144,41 @@ if offences:
 # a stray shell script or .env is still scanned while results dumps are not.
 # Patterns require a concrete username or credential value, so documentation
 # placeholders and this file do not match.
-PLACEHOLDERS = {
-    "...", "<", "your_", "your-", "your", "changeme", "none", "null", "example",
-    "placeholder", "redacted", "dummy", "xxx", "todo", "replace", "insert",
-    "username", "user", "you", "name", "someone", "person",
+PLACEHOLDER_EXACT = {
+    "...", "changeme", "none", "null", "example", "placeholder", "redacted",
+    "dummy", "xxx", "todo", "replace", "insert", "username", "user", "you",
+    "name", "someone", "person",
 }
+PLACEHOLDER_KEY_EXACT = PLACEHOLDER_EXACT | {
+    "your_api_key", "your-api-key",
+    "your_api_key_here", "your-api-key-here",
+    "your_tavily_api_key", "your-tavily-api-key",
+    "your_tavily_api_key_here", "your-tavily-api-key-here",
+    "your_exa_api_key", "your-exa-api-key",
+    "your_exa_api_key_here", "your-exa-api-key-here",
+}
+PLACEHOLDER_PREFIXES = (
+    "your_", "your-", "example_", "example-", "dummy_", "dummy-",
+    "placeholder_", "placeholder-",
+)
+PLACEHOLDER_SUFFIXES = (
+    "_here", "-here", "_example", "-example", "_placeholder", "-placeholder",
+)
+
+
+def is_placeholder_token(token):
+    if token in PLACEHOLDER_EXACT or (token.startswith("<") and token.endswith(">")):
+        return True
+    if token.startswith(PLACEHOLDER_PREFIXES) or token.endswith(PLACEHOLDER_SUFFIXES):
+        return True
+    return bool(re.fullmatch(r"[x*_.]+", token))
+
+
+def is_placeholder(label, val):
+    if label == "Tavily API key" and val.startswith("tvly-"):
+        suffix = val[5:]
+        return suffix in PLACEHOLDER_KEY_EXACT or bool(re.fullmatch(r"[x*]+", suffix))
+    return is_placeholder_token(val)
 patterns = {
     "Windows user path": re.compile(
         r"\b[A-Za-z]:[/\\]{1,2}Users[/\\]([^/\\\s\"'`<>]+)", re.I),
@@ -211,6 +244,25 @@ def binary(path):
         return True
 
 
+def verify_leak_detector():
+    """Self-test ensuring test-/substring-like keys are flagged, not skipped."""
+    tvly_pat = patterns["Tavily API key"]
+    for bad in (
+        "tvly-" + "test-AbCdEf1234567890XyZ987",
+        "tvly-" + "test_AbCdEf1234567890XyZ987",
+        "tvly-" + "1234567890abcdefghijyou",
+    ):
+        hit = tvly_pat.search(bad)
+        assert hit is not None and not is_placeholder("Tavily API key", hit.group(0).lower()), (
+            f"leak detector failed to flag {bad}")
+    for ok in ("tvly-" + "x" * 20, "tvly-" + "your_tavily_api_key_here"):
+        assert is_placeholder("Tavily API key", ok.lower()), (
+            f"leak detector rejected valid placeholder {ok}")
+    assert is_placeholder("Exa API key", "your_exa_api_key_here")
+    assert not is_placeholder("Exa API key", "test-abcdef1234567890xyz")
+
+
+verify_leak_detector()
 visible = git_visible_files()
 self_path = Path(__file__).resolve()
 clean = True
@@ -232,9 +284,9 @@ for f in sorted(root.rglob("*")):
     t = URL.sub(" ", read_text(f))
     for label, pattern in patterns.items():
         for hit in pattern.finditer(t):
-            # Ignore matches whose value is an obvious documentation stand-in.
+            # Ignore matches whose value is an explicit documentation stand-in.
             val = (hit.group(1) if hit.groups() else hit.group(0)).strip().strip("\"'").lower()
-            if any(p in val for p in PLACEHOLDERS):
+            if is_placeholder(label, val):
                 continue
             line_no = t.count("\n", 0, hit.start()) + 1
             print(f"LEAK in {rel}:{line_no}: {label}")
@@ -309,10 +361,24 @@ if eval_path.exists():
         eval_data = json.loads(read_text(eval_path))
     except (OSError, json.JSONDecodeError):
         eval_data = None
-    evals = (eval_data.get("evals") or []) if isinstance(eval_data, dict) else []
+    raw_evals = eval_data.get("evals") if isinstance(eval_data, dict) else None
+    evals = raw_evals if isinstance(raw_evals, list) else []
     eval_skill = eval_data.get("skill_name") if isinstance(eval_data, dict) else None
-    eval_ok = (isinstance(eval_data, dict) and eval_skill == name and len(evals) >= 6
-               and all(item.get("prompt") and item.get("expectations") for item in evals))
+    eval_ok = (
+        isinstance(eval_data, dict)
+        and eval_skill == name
+        and isinstance(raw_evals, list)
+        and len(evals) >= 6
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("prompt"), str)
+            and bool(item["prompt"].strip())
+            and isinstance(item.get("expectations"), list)
+            and bool(item["expectations"])
+            and all(isinstance(exp, str) and bool(exp.strip()) for exp in item["expectations"])
+            for item in evals
+        )
+    )
     print(f"skill evals: {len(evals)} cases -> {'OK' if eval_ok else 'INVALID'}")
     if isinstance(eval_data, dict) and eval_skill != name:
         print(f"  eval skill_name: {eval_skill or 'MISSING'} != frontmatter name {name or 'MISSING'}")
@@ -321,6 +387,44 @@ if eval_path.exists():
 else:
     print("skill evals: MISSING")
     errors.append("evals/evals.json is missing")
+
+trigger_path = root / "evals" / "trigger-set.json"
+if trigger_path.exists():
+    trigger_data = None
+    try:
+        trigger_data = json.loads(read_text(trigger_path))
+    except (OSError, json.JSONDecodeError):
+        trigger_data = None
+    raw_cases = trigger_data.get("cases") if isinstance(trigger_data, dict) else None
+    cases = raw_cases if isinstance(raw_cases, list) else []
+    trigger_skill = trigger_data.get("skill_name") if isinstance(trigger_data, dict) else None
+    case_ids = [c.get("id") for c in cases if isinstance(c, dict)]
+    trigger_ok = (
+        isinstance(trigger_data, dict)
+        and trigger_skill == name
+        and isinstance(raw_cases, list)
+        and len(cases) >= 2
+        and all(
+            isinstance(c, dict)
+            and isinstance(c.get("id"), str)
+            and bool(c["id"].strip())
+            and isinstance(c.get("query"), str)
+            and bool(c["query"].strip())
+            and isinstance(c.get("should_trigger"), bool)
+            for c in cases
+        )
+        and len(case_ids) == len(set(case_ids))
+        and any(c["should_trigger"] for c in cases)
+        and any(not c["should_trigger"] for c in cases)
+    )
+    print(f"trigger set: {len(cases)} cases -> {'OK' if trigger_ok else 'INVALID'}")
+    if isinstance(trigger_data, dict) and trigger_skill != name:
+        print(f"  trigger skill_name: {trigger_skill or 'MISSING'} != frontmatter name {name or 'MISSING'}")
+    if not trigger_ok:
+        errors.append("evals/trigger-set.json is invalid or lacks coverage")
+else:
+    print("trigger set: MISSING")
+    errors.append("evals/trigger-set.json is missing")
 
 # Reference links: every `references/*.md` a reader is sent to must exist, and
 # every file in references/ must be reachable from a document that cites it —
@@ -370,9 +474,16 @@ for doc in link_docs:
     path = root / doc
     if not path.exists():
         continue
+    last_targets = ["evidence.md"]
     for line in read_text(path).splitlines():
+        if not line.strip():
+            last_targets = ["evidence.md"]
+            continue
+        line_targets = re.findall(r"references/([\w.-]+\.md)", line)
+        if line_targets:
+            last_targets = line_targets
         for anchor in re.findall(r"§(\d+(?:\.\d+)*[a-z]?)", line):
-            targets = re.findall(r"references/([\w.-]+\.md)", line) or ["evidence.md"]
+            targets = line_targets or last_targets
             targets = [t for t in targets if t in numbered]  # a missing file is reported above
             if not targets:
                 continue

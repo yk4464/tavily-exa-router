@@ -1,4 +1,4 @@
-# Exa — Full Reference (snapshot 2026-08-18; sections re-checked 2026-10-06 / 2026-10-31)
+# Exa — Full Reference (snapshot 2026-08-18; sections re-checked 2026-10-06 / 2026-10-31 / 2026-11-18)
 
 Docs: https://exa.ai/docs/reference/search (moved from docs.exa.ai)
 Changelog: https://exa.ai/docs/changelog
@@ -20,7 +20,7 @@ Base: `https://api.exa.ai`
 | Parameter | Values / default | Notes |
 |---|---|---|
 | `query` | required | natural language works well — the index is semantic |
-| `type` | `auto` (default) / `lite` / `deep-lite` / `deep`; legacy `instant` / `fast` / `deep-reasoning` | Recommended types are `lite`, `auto`, and `deep`; the three legacy types keep working at their current prices. `instant` → `lite`; `fast` → `lite` (same search) or `auto` when the request needs a parameter `lite` does not support; `deep-reasoning` → `deep` (or Exa Agent). `lite` is $4/1k, cached content only, never a live fetch, with a restricted parameter set (below). Old `neural`/`keyword` values are **deprecated** but not inert — both returned 200 with different result sets on 2026-10-06. Mode-by-mode latency, cost, and quality: `references/evidence.md` §2. `instant` was strong for official/paper lookup; `auto` is the broad default; `deep-lite` showed no stable quality gain. ([changelog](https://exa.ai/docs/changelog), [search ref](https://exa.ai/docs/reference/search), checked 2026-10-31 (official docs, not measured)) |
+| `type` | `auto` (API default) / `lite` (skill default) / `deep-lite` / `deep`; legacy `instant` / `fast` / `deep-reasoning` | Recommended types are `lite`, `auto`, and `deep`; the three legacy types keep working at their current prices. Exa's changelog maps `instant` → `lite` (while this skill keeps `instant` only for Chinese-language queries when dates matter); `fast` → `lite` (same search) or `auto` when the request needs a parameter `lite` does not support; `deep-reasoning` → `deep` (or Exa Agent). `lite` is $4/1k, cached content only, never a live fetch, with a restricted parameter set (below). Old `neural`/`keyword` values are **deprecated** but not inert — `neural` returned 200 at $0.004 and `keyword` at $0.007 with no warning on 2026-11-18. Mode-by-mode latency, cost, and quality: `references/evidence.md` §2, §7, §8. `lite` is the skill's default (including news, academic, and reviews per 2026-11-18 testing), `auto` is reserved for parameters `lite` rejects, `instant` is kept solely for Chinese date-sensitive queries, and `deep-lite` showed no stable quality gain. ([changelog](https://exa.ai/docs/changelog), [search ref](https://exa.ai/docs/reference/search), checked 2026-10-31, re-tested 2026-11-18) |
 | `numResults` | 1–100, default 10 | beyond 10 results bills $1/1k extra results |
 | `includeDomains` / `excludeDomains` | arrays ≤1200 | supports wildcards (`*.substack.com`, verified strict) and path prefixes |
 | `startPublishedDate` / `endPublishedDate` | ISO 8601 datetime | effective for ordinary searches (verified all results inside window); rejected with the `company`/`people` categories ([search ref](https://exa.ai/docs/reference/search), checked 2026-10-31 (official docs, not measured)) |
@@ -100,25 +100,26 @@ Observed per-request costs: `references/evidence.md` §3.
 | `extras` | `{links, imageLinks, richImageLinks, richLinks (deprecated), codeBlocks (deprecated)}` 0–1000 each | structured side-data; `richLinks` and `codeBlocks` are deprecated ([search ref](https://exa.ai/docs/reference/search), checked 2026-10-31 (official docs, not measured)) |
 | `subpages` | 0–100 + `subpageTarget` terms | **deprecated on `/search`**; use `/contents`, which still supports `subpages`/`subpageTarget`. The 2026-08-18 `/search` test returned empty — do not depend on it there ([search ref](https://exa.ai/docs/reference/search), [contents guide](https://exa.ai/docs/contents/quickstart#crawl-subpages), checked 2026-10-31 (official docs, not measured)) |
 | `maxAgeHours` | −1…720 | `-1` cache only, `0` force live, positive values accept cache up to that age. 721 was accepted once — outside the documented range, do not use |
-| `snapshotAsOf` | ISO 8601 date-time or `YYYY-MM-DD` | newest stored version of each page as of that instant; historical requests are served from stored versions and never fetch live ([search ref](https://exa.ai/docs/reference/search), checked 2026-10-31 (official docs, not measured)) |
+| `snapshotAsOf` | ISO 8601 date-time or `YYYY-MM-DD` | newest stored version of each page as of that instant; historical requests are served from stored versions and never fetch live. **Paid plans only**: returned `403 SNAPSHOT_NOT_ON_PLAN` on a free-tier account on 2026-11-18 (`references/evidence.md` §8.4) ([search ref](https://exa.ai/docs/reference/search), checked 2026-10-31) |
 | `livecrawlTimeout` | 1–90,000 ms, default 10,000 | live-fetch timeout used with `maxAgeHours`; do not restore the deprecated `livecrawl` selector ([search ref](https://exa.ai/docs/reference/search), checked 2026-10-31 (official docs, not measured)) |
 
 For standalone `/contents`, inspect `statuses[]` for each URL. The HTTP request
 can succeed while individual pages report `error` tags such as
 `CRAWL_TIMEOUT` or `SOURCE_NOT_AVAILABLE`.
 
-### Measured retrieval behaviour (2026-08-18 to 2026-10-03)
+### Measured retrieval behaviour (2026-08-18 to 2026-11-18)
 
 Single-URL observations, not standing guarantees; the full 13-site matrix with
-timings lives in `references/evidence.md` §4 and §5.4.
+timings lives in `references/evidence.md` §4, §5.4, and §8.4.
 
-- Cache-only or 24h-cache requests (`maxAgeHours: -1`/`24`) reached Bilibili and
-  Tieba on 2026-10-03. Forced live fetching (`maxAgeHours: 0`) is flaky rather
-  than merely slow: it worked for Bilibili on 2026-08-18, but difficult sites
-  otherwise resolved in under 13s while Linux.do raised `CRAWL_UNKNOWN_ERROR`
-  from one egress and Tieba returned HTTP 500.
-- X and Reddit answer with `SOURCE_NOT_AVAILABLE`, and no cache setting changed
-  that.
+- **2026-11-18 re-test:** Tieba is no longer cache-available (`maxAgeHours: -1`
+  returned `CONTENT_NOT_CACHED`; `24` and `0` returned `CRAWL_HTTP_403`).
+  Bilibili succeeded only with `maxAgeHours: 24` (`-1` returned
+  `CONTENT_NOT_CACHED`, `0` returned HTTP 412). Linux.do succeeded across
+  `-1`, `0`, and `24`. X and Reddit remained `SOURCE_NOT_AVAILABLE`, and Zhihu
+  returned a login wall (`403` on forced live).
+- Earlier runs (2026-08-18 to 2026-10-03) had reached Bilibili and Tieba via
+  cache (`-1`/`24`), while forced live (`0`) was flaky and Tieba returned 500.
 - Docs, GitHub, and Hacker News were the strongest targets overall.
 
 ## Response fields that matter
@@ -161,19 +162,20 @@ Returns `{"databases": [{"name": "Pinecone", "url": "...", "best_for": "..."}]}`
 
 **Recent events with dates:**
 ```json
-{"query": "<topic> announcements", "type": "auto",
- "startPublishedDate": "<ISO-8601 timestamp computed at request time>", "numResults": 8}
+{"query": "<topic> announcements", "type": "lite",
+ "startPublishedDate": "<ISO-8601 start of the user's window, never the current instant>", "numResults": 8}
 ```
+(Rerun as `auto` if `highlights`/`text` come back thin.)
 
 **Individual practitioner opinions:**
 ```json
 {"query": "<product> real world experience criticism",
- "category": "personal site", "numResults": 8}
+ "type": "lite", "category": "personal site", "numResults": 8}
 ```
 
 **Company/entity research:**
 ```json
-{"query": "<company name>", "category": "company", "numResults": 5}
+{"query": "<company name>", "type": "lite", "category": "company", "numResults": 5}
 ```
 (no date filters with `company` — plan around it)
 
@@ -183,8 +185,9 @@ tasks.
 
 **Academic sweep:**
 ```json
-{"query": "<topic> survey", "includeDomains": ["arxiv.org"], "numResults": 10}
+{"query": "<topic> survey", "type": "lite", "numResults": 10}
 ```
+(For citation tracing, do not lock `includeDomains` to `arxiv.org`.)
 
 ## Pricing (checked 2026-10-31)
 

@@ -686,3 +686,153 @@ model; scores are title/URL/date judgments, not page-content verification.
 The date veto is sensitive to how "clearly worse" is defined — the raw gaps
 are in §7.2, and the academic/Chinese conclusions flip to `lite` if the date
 difference is treated as metadata rather than a quality loss.
+
+
+## 8. Full re-benchmark and parameter sweep, 2026-11-18
+
+Full live re-test from one local Windows workstation using spare test accounts
+(free-tier plans for both providers). Artifacts were written outside the skill
+repository under `tavily-exa-router-workspace/bench-2026-11-18/`.
+
+Blind quality scoring ran across 39 unique queries and 825 unique deduplicated
+results (`batch_compare`, `lite_quality`, `mode_quality`, and
+`comprehensive_modes` pooled and shuffled without provider or mode labels): 823
+scoreable, 2 `unscoreable` (`empty_shell`), 0 login walls or injections in
+search snippets. A stratified double-rating overlap of 164 items (8 queries,
+19.9% of items) measured inter-rater agreement: relevance exact 89.63% / QWK
+0.892, authority exact 87.80% / QWK 0.905, timeliness (n=89) exact 93.26% / QWK
+0.951, zero `unscoreable` disagreements.
+
+### 8.1 Broad 20-query comparison (`batch_compare.json`)
+
+Tavily `basic` (`topic: "general"`) vs Exa `lite` (8 requested results per
+query, 160 vs 160 returned):
+
+| Metric | Tavily `basic` | Exa `lite` |
+|---|---:|---:|
+| Results returned | 160 | 160 |
+| Allowlisted community-domain hits | **17** | 8 |
+| Allowlisted authoritative-domain hits | 16 | **31** |
+| Results carrying a publication date | 0 (flag omitted) | **88** |
+| Median / p95 latency | 3,158 / 15,955 ms | **840 / 15,427 ms** |
+| Blind relevance (0–3) | 2.459 | **2.650** |
+| Blind authority (0–3) | 1.799 | **2.094** |
+| Blind timeliness (0–3, 12 dated queries) | 1.874 | **2.250** |
+
+Mean per-query domain Jaccard overlap was **0.151**. Paired blind differences
+(Exa `lite` − Tavily `basic`): relevance **+0.189** `[+0.064, +0.318]`,
+authority **+0.296** `[+0.146, +0.449]`, timeliness **+0.374**
+`[+0.165, +0.571]`.
+
+### 8.2 Exa `lite` vs legacy `instant` / `fast` / `auto` (`lite_quality.json`)
+
+Six queries per class (`news`, `academic`, `chinese` — small sample, n=6 per
+class), 3 latency repeats per query/type, plus contents/date-window/Tavily
+checks:
+
+| Class | Type | Dated share | Blind rel | Blind auth | Blind time | Median ms | Cost/call |
+|---|---|---:|---:|---:|---:|---:|---:|
+| news | `lite` | **76.1%** | 2.674 | 1.957 | **2.761** | 935 ms | $0.004 |
+| news | `instant` | 68.8% | 2.417 | 2.188 | 2.000 | 1,068 ms | $0.004 |
+| news | `fast` | 76.1% | 2.674 | 1.957 | 2.761 | 1,098 ms | $0.007 |
+| news | `auto` | 76.1% | 2.609 | 2.043 | 2.761 | 1,172 ms | $0.007 |
+| academic | `lite` | **56.2%** | 2.792 | 2.896 | — | **927 ms** | $0.004 |
+| academic | `instant` | 52.1% | 2.750 | 2.938 | — | 1,556 ms | $0.004 |
+| academic | `fast` | 56.2% | 2.750 | 2.896 | — | 1,003 ms | $0.007 |
+| academic | `auto` | 43.8% | 2.812 | 2.875 | — | 1,404 ms | $0.007 |
+| Chinese | `lite` | 54.2% | 2.583 | 1.917 | 2.104 | 1,114 ms | $0.004 |
+| Chinese | `instant` | **79.2%** | **2.729** | 1.875 | **2.333** | 1,452 ms | $0.004 |
+| Chinese | `fast` | 54.2% | 2.583 | 1.917 | 2.104 | 1,318 ms | $0.007 |
+| Chinese | `auto` | 68.8% | 2.562 | 1.917 | 2.021 | 1,410 ms | $0.007 |
+
+Key findings (`lite` − comparison, 95% paired CI):
+- **News (`lite` holds):** `lite` led `instant` on dated share (76.1% vs 68.8%)
+  and blind timeliness (+0.743 `[+0.389, +1.097]`).
+- **Academic (flipped to `lite`; n=6 queries):** `lite` matched or exceeded
+  `instant` on dated share (56.2% vs 52.1%), tied on blind relevance (+0.042
+  `[-0.042, +0.146]`) and authority (−0.042 `[-0.146, +0.042]`), and ran faster
+  (927 vs 1,556 ms). Academic queries now default to `lite`; dated product
+  reviews (which previously borrowed `instant`'s cross-class date-coverage
+  rationale without dedicated measurement) also revert to `lite`.
+- **Chinese (`instant` holds when dates matter):** `instant` kept a large
+  date-coverage lead (79.2% vs 54.2%) and higher blind relevance (`lite −
+  instant` −0.146 `[-0.271, -0.042]`) and timeliness (−0.229 `[-0.396,
+  -0.042]`).
+- **Overlap and `auto`:** `lite` vs `fast` Jaccard was **0.975** (blind Δ
+  0.000); `lite` vs `auto` Jaccard dropped to **0.615** (from 0.988 on
+  2026-10-31), while blind quality differences remained within noise (all CIs
+  crossing zero).
+- **Contents, date windows, Tavily dates:** all 90 `contents` calls returned 8/8
+  results (0% `lite` drop). `startPublishedDate` set to "now" collapsed
+  academic recall to 1 result (dated `2026-11-21`, future-dated), while 7-day
+  windows returned 7–8/8 dated results inside the window. `lite` +
+  `outputSchema` and `lite` + `contents.summary` both returned 400 naming the
+  field. Tavily `include_published_date: true` returned 43/48 dated results vs
+  0/16 omitted vs 8/8 on `topic: news`.
+
+### 8.3 Modes, serial latency, and community (`speed_test`, `mode_quality`, `comprehensive_modes`, `community_test`)
+
+- **Serial latency (`speed_test.json`):** Round A medians (5 samples; 1 SSL EOF
+  error on `exa_lite`): Exa `lite` **922 ms**, `auto` **953 ms**, `instant`
+  **1,018 ms** vs Tavily `basic` **1,991 ms**. Round B medians (2 samples):
+  Exa `lite` 838 ms, `auto` 977 ms, `fast` 1,286 ms, `instant` 1,647 ms,
+  `deep-lite` 2,247 ms, `deep` 8,752 ms; Tavily `fast` 1,648 ms, `basic`
+  1,936 ms, `ultra-fast` 2,197 ms, `advanced` 3,049 ms.
+- **Mode blind scores:** in `mode_quality` (4 queries × 5 results = 20 per
+  mode), Tavily `basic` (rel 2.65, auth 1.55) matched `advanced` (rel 2.60, auth
+  1.50). In `comprehensive_modes` (4 queries × 8 results = 32 per mode), Tavily
+  `ultra-fast` (rel 1.250, auth 0.906) and `fast` (rel 2.281, auth 1.000)
+  trailed `basic` (rel 1.688, auth 1.562) and `advanced` (rel 2.469, auth
+  1.562) on authority, while Exa `deep-reasoning` still drifted to English on
+  the Chinese query (4/5 English titles).
+- **`community_test.txt`:** EN Tailwind returned 2/8 allowlisted community hits
+  on Tavily `basic`, 1/8 on Exa `lite`, 2/8 on Exa `deep`; CN Rust returned 1/8
+  on Tavily `basic`, 3/8 on Exa `lite`, 1/8 on Exa `deep`.
+
+### 8.4 Full parameter sweep (`param_sweep.json`, 136 probes) and 13-site matrix (`comprehensive_extract.json`)
+
+- **Exa parameters:**
+  - Omitting `type` defaulted to `auto` ($0.007). `lite` ($0.004), `instant`
+    ($0.004), `auto`/`fast` ($0.007), `deep`/`deep-lite` ($0.012),
+    `deep-reasoning` ($0.015), `numResults: 11` ($0.005), `100` (99 returned,
+    $0.093), and `0`/`101` → 400 all held.
+  - All 13 documented `lite`-incompatible fields (`outputSchema`,
+    `contents.summary`, `maxAgeHours: -1`, `systemPrompt`, `stream`,
+    `additionalQueries`, `extras`, `subpages`, `livecrawl`, `livecrawlTimeout`,
+    `startCrawlDate`, `includeText`, `context`) returned HTTP 400 naming the
+    field.
+  - **`lite` + `snapshotAsOf`:** returned **HTTP 403 (`SNAPSHOT_NOT_ON_PLAN`)**
+    on the free-tier account (paid plans only).
+  - `company`/`people` + date → 400, `people` + `excludeDomains` → 400,
+    `company` + `excludeDomains` → 200. `outputSchema` limits (11 props / 3
+    levels / array missing `items` → 400; valid schema $0.007 with ~3 s extra
+    latency). `highlights.dynamic` returned 400 without `Exa-Beta` header and
+    200 with it.
+  - Deprecated `type: "neural"` returned 200 at $0.004 and `"keyword"` at
+    $0.007 with no warning; `startCrawlDate` and top-level `context` emitted
+    `IGNORED_FIELD` warnings.
+- **Tavily parameters:**
+  - `include_answer` `basic` (918 chars) and `advanced` (672 chars) both billed
+    1 credit. `auto_parameters: true` with explicit `search_depth: basic`
+    billed 2 credits. `safe_search: true` returned 200 on `basic` and 400 on
+    `fast`/`ultra-fast`. `include_domains_mode: prefer` allowed external
+    domains (400 without `include_domains`); `filter_by_language` filtered
+    strictly (400 without `language`).
+  - **Undocumented server leniency (drift; keep documented limits):**
+    `max_results: 21` returned 21 results (200); `chunks_per_source: 4`,
+    `country` + `topic: news`, 1,501-char `query`, and `/extract` `timeout: 61`
+    all returned 200 (`/extract` `timeout: 0` error cited `1 and 120 seconds`).
+- **13-site fetch matrix (`comprehensive_extract.json` + `param_sweep.json`):**
+  - Docs, Python docs, GitHub, HN, arXiv, dev.to, Medium succeeded on both.
+  - **Tieba:** unavailable on both (Tavily failed; Exa `maxAgeHours: -1`
+    returned `CONTENT_NOT_CACHED`, `24` and `0` returned `CRAWL_HTTP_403` rather
+    than 500).
+  - **Bilibili:** Tavily `basic`/`advanced` returned a 5,234-char login wall;
+    Exa succeeded only at `maxAgeHours: 24` (460 chars; `-1` returned
+    `CONTENT_NOT_CACHED`, `0` returned HTTP 412).
+  - **X (`x.com/elonmusk`):** Tavily returned 5,094 chars of a login prompt
+    shell; Exa returned `SOURCE_NOT_AVAILABLE`.
+  - **Linux.do:** Exa succeeded across `-1`/`0`/`24`; Tavily `basic` failed and
+    `advanced` succeeded with the tail prompt-injection block.
+  - **Zhihu & Reddit:** Zhihu returned a login wall on both (Exa `0` returned
+    `CRAWL_HTTP_403`); Reddit failed on both (`SOURCE_NOT_AVAILABLE` on Exa).

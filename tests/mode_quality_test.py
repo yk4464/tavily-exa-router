@@ -1,8 +1,9 @@
 """Phase 3a: search-mode quality comparison.
 
 Same 4 queries through Tavily {basic, fast, advanced} and
-Exa {instant, fast, auto, deep-lite}. Results saved for manual quality review.
+Exa {lite, instant, fast, auto, deep-lite, deep}. Results saved for manual quality review.
 """
+import argparse
 import json
 import os
 import time
@@ -19,8 +20,8 @@ def api_key(name):
     return value
 
 
-TAVILY_KEY = api_key("TAVILY_API_KEY")
-EXA_KEY = api_key("EXA_API_KEY")
+TAVILY_KEY = None
+EXA_KEY = None
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
 
@@ -54,7 +55,7 @@ QUERIES = [
 ]
 
 jobs = [("tavily", m, ql, q) for ql, q in QUERIES for m in ("basic", "fast", "advanced")]
-jobs += [("exa", m, ql, q) for ql, q in QUERIES for m in ("instant", "fast", "auto", "deep-lite")]
+jobs += [("exa", m, ql, q) for ql, q in QUERIES for m in ("lite", "instant", "fast", "auto", "deep-lite", "deep")]
 
 
 def run(job):
@@ -84,10 +85,19 @@ def run(job):
                 "results": [], "usage": None, "error": str(exc)}
 
 
-if __name__ == "__main__":
+def main():
+    global TAVILY_KEY, EXA_KEY, OUT_DIR
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out-dir", type=Path, default=OUT_DIR, help="directory for raw JSON output")
+    args = parser.parse_args()
+
+    TAVILY_KEY = api_key("TAVILY_API_KEY")
+    EXA_KEY = api_key("EXA_API_KEY")
+    OUT_DIR = args.out_dir
+
     # Fail on an unwritable output directory before spending any API calls.
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=4) as ex:
         out = list(ex.map(run, jobs))
     output = OUT_DIR / "mode_quality.json"
     with open(output, "w", encoding="utf-8") as f:
@@ -108,3 +118,7 @@ if __name__ == "__main__":
                             extra = f" {res.get('d') or 'no-date'}"
                         print(f"     {i}. {res['t'][:66]}{extra}")
     print(f"\nsaved -> {output}")
+
+
+if __name__ == "__main__":
+    main()

@@ -12,7 +12,7 @@ of them, and they rot. Everything a maintainer needs lives beside it:
 
 | File | Role |
 |---|---|
-| `references/evidence.md` | Measurements behind the rules, dated and sectioned (§1–§7) |
+| `references/evidence.md` | Measurements behind the rules, dated and sectioned (§1–§8) |
 | `references/tavily.md` | Full Tavily parameter, endpoint and price reference |
 | `references/exa.md` | Full Exa parameter, `contents`, `outputSchema` and price reference |
 | `references/community-feedback.md` | Dated practitioner reports and provider issue trackers |
@@ -66,7 +66,7 @@ no matching numbered heading.
 - **Minor** (1.x.0): new routing rules, new references, rule refinements
   backed by new evidence
 - **Major** (x.0.0): a headline conclusion reversed (e.g. "fast mode is now
-  good", "Exa wins Chinese content") — README positioning may need rewording
+  good", "Tavily wins Chinese content") — README positioning may need rewording
 
 ## CI drift check
 

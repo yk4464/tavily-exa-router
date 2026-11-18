@@ -14,8 +14,8 @@ def api_key(name):
     return value
 
 
-TAVILY_KEY = api_key("TAVILY_API_KEY")
-EXA_KEY = api_key("EXA_API_KEY")
+TAVILY_KEY = None
+EXA_KEY = None
 
 TARGETS = {
     "linux.do": "https://linux.do/t/topic/1774105",
@@ -59,49 +59,58 @@ def trunc(s, n=80):
     return s[: n - 1] + "…" if len(s) > n else s
 
 
-urls = list(TARGETS.values())
+def main():
+    global TAVILY_KEY, EXA_KEY
+    TAVILY_KEY = api_key("TAVILY_API_KEY")
+    EXA_KEY = api_key("EXA_API_KEY")
 
-print("=" * 78)
-print("Tavily Extract API")
-print("=" * 78)
-try:
-    data = post("https://api.tavily.com/extract", {"urls": urls},
-                {"Authorization": f"Bearer {TAVILY_KEY}"})
-    ok = {r["url"]: r.get("raw_content") or "" for r in data.get("results", [])}
-    for name, u in TARGETS.items():
-        content = ok.get(u)
-        if content is None:
-            err = next((f.get("error") for f in data.get("failed_results", [])
-                        if f.get("url") == u), "no result")
-            print(f"  {name:<10} ❌ 失败: {err}")
-        else:
-            print(f"  {name:<10} ✅ {classify(content)} | {len(content)} chars")
-            print(f"              {trunc(content, 90)}")
-except Exception as exc:  # noqa: BLE001
-    print(f"  API ERROR: {exc}")
+    urls = list(TARGETS.values())
 
-print()
-print("=" * 78)
-print("Exa Contents API (maxAgeHours=0 强制实时抓取)")
-print("=" * 78)
-try:
-    payload = {"ids": urls, "text": {"maxCharacters": 3000}, "maxAgeHours": 0}
-    payload["livecrawlTimeout"] = 30000
-    data = post("https://api.exa.ai/contents", payload, {"x-api-key": EXA_KEY})
-    results = data.get("results", [])
-    statuses = {s.get("id"): s for s in data.get("statuses", [])}
-    got = {}
-    for r in results:
-        key = r.get("id") or r.get("url")
-        got[key] = (r.get("text") or "")[:3000]
-    for name, u in TARGETS.items():
-        content = got.get(u)
-        if content is None:
-            status = statuses.get(u) or {}
-            detail = status.get("error") or status.get("status") or "no status"
-            print(f"  {name:<10} ❌ 未返回该 URL | {detail}")
-        else:
-            print(f"  {name:<10} {'✅' if content else '⚠️ '} {classify(content)} | {len(content)} chars")
-            print(f"              {trunc(content, 90)}")
-except Exception as exc:  # noqa: BLE001
-    print(f"  API ERROR: {exc}")
+    print("=" * 78)
+    print("Tavily Extract API")
+    print("=" * 78)
+    try:
+        data = post("https://api.tavily.com/extract", {"urls": urls},
+                    {"Authorization": f"Bearer {TAVILY_KEY}"})
+        ok = {r["url"]: r.get("raw_content") or "" for r in data.get("results", [])}
+        for name, u in TARGETS.items():
+            content = ok.get(u)
+            if content is None:
+                err = next((f.get("error") for f in data.get("failed_results", [])
+                            if f.get("url") == u), "no result")
+                print(f"  {name:<10} ❌ 失败: {err}")
+            else:
+                print(f"  {name:<10} ✅ {classify(content)} | {len(content)} chars")
+                print(f"              {trunc(content, 90)}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  API ERROR: {exc}")
+
+    print()
+    print("=" * 78)
+    print("Exa Contents API (maxAgeHours=0 强制实时抓取)")
+    print("=" * 78)
+    try:
+        payload = {"ids": urls, "text": {"maxCharacters": 3000}, "maxAgeHours": 0}
+        payload["livecrawlTimeout"] = 30000
+        data = post("https://api.exa.ai/contents", payload, {"x-api-key": EXA_KEY})
+        results = data.get("results", [])
+        statuses = {s.get("id"): s for s in data.get("statuses", [])}
+        got = {}
+        for r in results:
+            key = r.get("id") or r.get("url")
+            got[key] = (r.get("text") or "")[:3000]
+        for name, u in TARGETS.items():
+            content = got.get(u)
+            if content is None:
+                status = statuses.get(u) or {}
+                detail = status.get("error") or status.get("status") or "no status"
+                print(f"  {name:<10} ❌ 未返回该 URL | {detail}")
+            else:
+                print(f"  {name:<10} {'✅' if content else '⚠️ '} {classify(content)} | {len(content)} chars")
+                print(f"              {trunc(content, 90)}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  API ERROR: {exc}")
+
+
+if __name__ == "__main__":
+    main()

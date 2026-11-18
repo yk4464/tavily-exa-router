@@ -17,8 +17,8 @@ def api_key(name):
     return value
 
 
-TAVILY_KEY = api_key("TAVILY_API_KEY")
-EXA_KEY = api_key("EXA_API_KEY")
+TAVILY_KEY = None
+EXA_KEY = None
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "search_results"
 
@@ -75,26 +75,34 @@ def trunc(s, n=70):
     return s[: n - 1] + "…" if len(s) > n else s
 
 
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+def main():
+    global TAVILY_KEY, EXA_KEY
+    TAVILY_KEY = api_key("TAVILY_API_KEY")
+    EXA_KEY = api_key("EXA_API_KEY")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-for label, q in QUERIES:
-    print(f"\n{'=' * 80}\nQUERY [{label}]: {q}\n{'=' * 80}")
-    for name, fn in (("TAVILY", tavily_search), ("EXA", exa_search)):
-        try:
-            data = fn(q)
-        except Exception as exc:  # noqa: BLE001
-            print(f"\n--- {name} ERROR: {exc}")
-            continue
-        output = OUT_DIR / f"{label}_{name.lower()}.json"
-        with open(output, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        results = data.get("results", [])
-        print(f"\n--- {name} ({len(results)} results, response_time={data.get('response_time', 'n/a')})")
-        for i, r in enumerate(results, 1):
-            title = trunc(r.get("title"), 58)
-            pub = (r.get("publishedDate") or r.get("published_date") or "")[:10]
-            score = r.get("score") or r.get("relevance_score")
-            score_s = f"{score:.3f}" if isinstance(score, (int, float)) else "  -  "
-            snippet = r.get("text") or r.get("content") or ""
-            print(f"  {i}. [{domain(r.get('url',''))}] {title} | {pub or 'no-date'} | {score_s}")
-            print(f"     {trunc(snippet, 96)}")
+    for label, q in QUERIES:
+        print(f"\n{'=' * 80}\nQUERY [{label}]: {q}\n{'=' * 80}")
+        for name, fn in (("TAVILY", tavily_search), ("EXA", exa_search)):
+            try:
+                data = fn(q)
+            except Exception as exc:  # noqa: BLE001
+                print(f"\n--- {name} ERROR: {exc}")
+                continue
+            output = OUT_DIR / f"{label}_{name.lower()}.json"
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            results = data.get("results", [])
+            print(f"\n--- {name} ({len(results)} results, response_time={data.get('response_time', 'n/a')})")
+            for i, r in enumerate(results, 1):
+                title = trunc(r.get("title"), 58)
+                pub = (r.get("publishedDate") or r.get("published_date") or "")[:10]
+                score = r.get("score") or r.get("relevance_score")
+                score_s = f"{score:.3f}" if isinstance(score, (int, float)) else "  -  "
+                snippet = r.get("text") or r.get("content") or ""
+                print(f"  {i}. [{domain(r.get('url',''))}] {title} | {pub or 'no-date'} | {score_s}")
+                print(f"     {trunc(snippet, 96)}")
+
+
+if __name__ == "__main__":
+    main()

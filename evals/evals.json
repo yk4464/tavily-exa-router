@@ -38,12 +38,12 @@
     },
     {
       "id": 4,
-      "name": "academic-exa-instant-no-arxiv-lock",
+      "name": "academic-exa-lite-no-arxiv-lock",
       "prompt": "Find the original Mamba paper and related surveys.",
-      "expected_output": "Route academic discovery to Exa `instant`, whose `publishedDate` coverage on academic results is higher than `lite`, falling back to `lite` only if `instant` is rejected; keep repositories and scholarly indexes available instead of restricting citation tracing to arXiv.",
+      "expected_output": "Route academic discovery to Exa `lite`; keep repositories and scholarly indexes available instead of restricting citation tracing to arXiv.",
       "files": [],
       "expectations": [
-        "Selects Exa `instant` for the academic pass rather than `auto`, allowing `lite` only when dates do not matter or `instant` is rejected",
+        "Selects Exa `lite` for the academic pass rather than `auto` or `instant`",
         "Does not claim semantic search is a citation index",
         "Does not lock includeDomains to arxiv.org for citation tracing"
       ]
@@ -246,13 +246,12 @@
     {
       "id": 21,
       "name": "both-providers-fail-host-builtin-fallback",
-      "prompt": "Tavily returned 503, I retried once and it failed again; Exa timed out, I retried once and it timed out again. I still need the latest nginx security advisories.",
-      "expected_output": "Do not retry either provider again. Both providers failed, so use the host's built-in retrieval for this request, name which provider attempts failed, and still answer.",
+      "prompt": "Tavily returned 503 and Exa timed out when I tried to look up the latest nginx security advisories. I still need those advisories.",
+      "expected_output": "Both providers failed, so do not keep retrying either provider; use the host's built-in retrieval for this request and still answer.",
       "files": [],
       "expectations": [
-        "Does not retry Tavily or Exa again after their attempts already failed",
+        "Does not keep retrying Tavily or Exa after both providers have already failed",
         "Uses the host's built-in retrieval (WebSearch/WebFetch/browser) once both providers have failed",
-        "Names the failed Tavily and Exa attempts",
         "Still attempts the user's task instead of stopping at the error"
       ]
     },
@@ -286,11 +285,11 @@
       "id": 24,
       "name": "publication-dates-tavily-opt-in",
       "prompt": "Find recent reviews of Rust async runtimes and give me the exact publication date of each result — the dates matter for a timeline I'm building.",
-      "expected_output": "Do not claim Tavily cannot return publication dates. Get the dates from Tavily with `include_published_date: true` (`topic: news` enables it automatically) or from Exa `instant`, which returns `publishedDate` without opt-in; report an absent date as null instead of inventing one.",
+      "expected_output": "Do not claim Tavily cannot return publication dates. Get the dates from Tavily with `include_published_date: true` (`topic: news` enables it automatically) or from Exa `lite`, which returns `publishedDate` without opt-in; report an absent date as null instead of inventing one.",
       "files": [],
       "expectations": [
         "Does not claim Tavily cannot return publication dates",
-        "Either sets Tavily `include_published_date: true` or uses Exa `instant` for the dated pass, not a default Tavily call without the flag",
+        "Either sets Tavily `include_published_date: true` or uses Exa `lite` for the dated pass, not a default Tavily call without the flag",
         "Reports an absent date as null or unknown instead of inventing one"
       ]
     },
